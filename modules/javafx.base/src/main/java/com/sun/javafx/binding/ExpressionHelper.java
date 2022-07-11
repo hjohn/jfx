@@ -342,8 +342,12 @@ public abstract class ExpressionHelper<T> extends ExpressionHelperBase {
             final int curChangeSize = changeSize;
 
             try {
+                if(locked) {
+                    throw new AssertionError("already locked");
+                }
                 locked = true;
-                for (int i = 0; i < curInvalidationSize; i++) {
+//                for (int i = 0; i < curInvalidationSize; i++) {
+                for (int i = curInvalidationSize - 1; i >= 0; i--) {
                     try {
                         curInvalidationList[i].invalidated(observable);
                     } catch (Exception e) {
@@ -355,7 +359,8 @@ public abstract class ExpressionHelper<T> extends ExpressionHelperBase {
                     currentValue = observable.getValue();
                     final boolean changed = (currentValue == null)? (oldValue != null) : !currentValue.equals(oldValue);
                     if (changed) {
-                        for (int i = 0; i < curChangeSize; i++) {
+//                        for (int i = 0; i < curChangeSize; i++) {
+                        for (int i = curChangeSize - 1; i >= 0; i--) {
                             try {
                                 curChangeList[i].changed(observable, oldValue, currentValue);
                             } catch (Exception e) {
