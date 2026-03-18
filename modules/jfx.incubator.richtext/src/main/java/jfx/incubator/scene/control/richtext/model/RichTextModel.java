@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -80,8 +80,21 @@ public class RichTextModel extends StyledTextModel {
 
     @Override
     public RichParagraph getParagraph(int index) {
+        RichParagraph.Builder b = prepareParagraph(index);
+        return b.build();
+    }
+
+    /**
+     * Prepares the paragraph by populating a builder with the paragraph content.
+     * This method allows the custom model to add highlights and decorations
+     * without affecting the base class storage model.
+     * @param index the paragraph index
+     * @return the builder
+     * @since 26
+     */
+    protected RichParagraph.Builder prepareParagraph(int index) {
         RParagraph p = paragraphs.get(index);
-        return p.createRichParagraph();
+        return p.buildParagraph();
     }
 
     @Override
@@ -321,11 +334,12 @@ public class RichTextModel extends StyledTextModel {
         public StyleAttributeMap getStyleAttributeMap(int offset) {
             int pos = 0;
             int ct = size();
+            int last = ct - 1;
             for (int i = 0; i < ct; i++) {
                 RSegment seg = get(i);
                 int len = seg.getTextLength();
                 pos += len;
-                if ((offset <= pos) || (i + 1 == ct)) {
+                if ((offset <= pos) || (i == last)) {
                     return seg.getStyleAttributeMap();
                 }
             }
@@ -794,7 +808,7 @@ public class RichTextModel extends StyledTextModel {
             }
         }
 
-        private RichParagraph createRichParagraph() {
+        private RichParagraph.Builder buildParagraph() {
             RichParagraph.Builder b = RichParagraph.builder();
             for (RSegment seg : this) {
                 String text = seg.text();
@@ -802,7 +816,7 @@ public class RichTextModel extends StyledTextModel {
                 b.addSegment(text, a);
             }
             b.setParagraphAttributes(paragraphAttrs);
-            return b.build();
+            return b;
         }
     }
 }
