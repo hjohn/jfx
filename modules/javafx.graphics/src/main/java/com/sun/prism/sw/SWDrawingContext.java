@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,9 +27,21 @@ package com.sun.prism.sw;
 
 import com.sun.glass.ui.Screen;
 import com.sun.glass.utils.NativeLibLoader;
+import com.sun.javafx.font.FontResource;
+import com.sun.javafx.font.FontStrike;
+import com.sun.javafx.font.PGFont;
 import com.sun.javafx.geom.Arc2D;
+import com.sun.javafx.geom.BaseBounds;
 import com.sun.javafx.geom.Path2D;
+import com.sun.javafx.geom.Point2D;
+import com.sun.javafx.geom.RectBounds;
 import com.sun.javafx.geom.Rectangle;
+import com.sun.javafx.geom.transform.Affine2D;
+import com.sun.javafx.geom.transform.BaseTransform;
+import com.sun.javafx.scene.text.FontHelper;
+import com.sun.javafx.scene.text.GlyphList;
+import com.sun.javafx.scene.text.TextLayout;
+import com.sun.javafx.text.PrismTextLayoutFactory;
 import com.sun.javafx.tk.Toolkit;
 import com.sun.javafx.util.FXCleaner;
 import com.sun.prism.BasicStroke;
@@ -40,9 +52,12 @@ import com.sun.prism.Texture;
 import com.sun.prism.Texture.Usage;
 
 import java.nio.IntBuffer;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import javafx.geometry.VPos;
 import javafx.scene.effect.BlendMode;
 import javafx.scene.image.DrawingContext;
 import javafx.scene.image.Image;
@@ -53,9 +68,11 @@ import javafx.scene.shape.ArcType;
 import javafx.scene.shape.FillRule;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontSmoothingType;
+import javafx.scene.text.TextAlignment;
+import javafx.scene.transform.Affine;
 
-// TODO dashes
-// TODO save/restore
 /**
  * A software-based drawing context for {@link com.sun.prism.Image} that allows direct rendering of shapes, paths, and
  * images into a Prism image buffer.
@@ -78,8 +95,8 @@ import javafx.scene.shape.StrokeLineJoin;
  * <p>
  * Limitations:
  * <ul>
- *   <li>Dashed strokes and save/restore state are not yet implemented.</li> TODO
- *   <li>Only SRC_OVER and ADD blend modes are supported; others will throw an exception.</li>
+ *   <li>Dashed strokes are not yet implemented.</li> TODO
+ *   <li>Only SRC_OVER blend mode is supported; others will throw an exception.</li>
  * </ul>
   * <p>
  * This class is intended for use in contexts where direct drawing into a Prism image is needed, such as the
@@ -88,7 +105,7 @@ import javafx.scene.shape.StrokeLineJoin;
  *
  * @see DrawingContext
  * @see com.sun.prism.Image
- * @since 26
+ * @since 28
  */
 public class SWDrawingContext implements DrawingContext {
     private static final double SQRT2 = Math.sqrt(2);
@@ -100,6 +117,12 @@ public class SWDrawingContext implements DrawingContext {
     private final Graphics graphics;
     private final SWResourceFactory resourceFactory;
     private final Consumer<Rectangle> pixelsDirty;
+    private final int imageWidth;
+    private final int imageHeight;
+    private final Affine2D transform = new Affine2D();
+    private final Deque<State> stateStack = new ArrayDeque<>();
+
+    private Rectangle clip;
 
     // Common rendering attributes
     private double globalAlpha = 1.0;
@@ -121,10 +144,35 @@ public class SWDrawingContext implements DrawingContext {
     // Image attributes
     private boolean imageSmoothing = true;
 
+    // Text attributes
+    private Font font = Font.getDefault();
+    private TextAlignment textAlign = TextAlignment.LEFT;
+    private VPos textBaseline = VPos.BASELINE;
+    private FontSmoothingType fontSmoothingType = FontSmoothingType.GRAY;
+
     // Cached prism values
     private com.sun.prism.paint.Paint prismFillPaint = com.sun.prism.paint.Color.BLACK;
     private com.sun.prism.paint.Paint prismStrokePaint = com.sun.prism.paint.Color.BLACK;
     private BasicStroke prismStroke;
+
+    private record State(
+        double globalAlpha,
+        BlendMode globalBlendMode,
+        Paint fill,
+        Paint stroke,
+        double lineWidth,
+        StrokeLineCap lineCap,
+        StrokeLineJoin lineJoin,
+        double miterLimit,
+        FillRule fillRule,
+        boolean imageSmoothing,
+        Font font,
+        TextAlignment textAlign,
+        VPos textBaseline,
+        FontSmoothingType fontSmoothingType,
+        double mxx, double myx, double mxy, double myy, double mxt, double myt,
+        Rectangle clip
+    ) {}
 
     /**
      * Constructs a new instance.
@@ -145,6 +193,8 @@ public class SWDrawingContext implements DrawingContext {
         };
 
         this.pixelsDirty = Objects.requireNonNull(pixelsDirty, "pixelsDirty");
+        this.imageWidth = img.getWidth();
+        this.imageHeight = img.getHeight();
         this.resourceFactory = new SWResourceFactory(Screen.getMainScreen()); // Note, actual screen is irrelevant, we just need one
 
         SWRTTexture texture = new SWRTTexture(resourceFactory, img.getWidth(), img.getHeight(), data);
@@ -210,8 +260,7 @@ public class SWDrawingContext implements DrawingContext {
         if (op != null) {
             CompositeMode cm = switch (op) {
                 case SRC_OVER -> CompositeMode.SRC_OVER;
-                case ADD -> CompositeMode.ADD;
-                default -> throw new IllegalArgumentException("Unsupported blend mode: " + op);
+                default -> throw new UnsupportedOperationException("Unsupported blend mode: " + op);
             };
 
             this.globalBlendMode = op;
@@ -299,17 +348,224 @@ public class SWDrawingContext implements DrawingContext {
     }
 
     @Override
+    public Affine getTransform() {
+        return getTransform(null);
+    }
+
+    @Override
+    public Affine getTransform(Affine xform) {
+        if (xform == null) {
+            xform = new Affine();
+        }
+
+        xform.setMxx(transform.getMxx());
+        xform.setMxy(transform.getMxy());
+        xform.setMxz(0);
+        xform.setTx(transform.getMxt());
+        xform.setMyx(transform.getMyx());
+        xform.setMyy(transform.getMyy());
+        xform.setMyz(0);
+        xform.setTy(transform.getMyt());
+        xform.setMzx(0);
+        xform.setMzy(0);
+        xform.setMzz(1);
+        xform.setTz(0);
+
+        return xform;
+    }
+
+    @Override
+    public void setTransform(
+        double mxx, double myx,
+        double mxy, double myy,
+        double mxt, double myt
+    ) {
+        if (clip != null && (mxy != 0 || myx != 0)) {
+            throw new UnsupportedOperationException("a transform with rotation or shear cannot be set while a clip is active");
+        }
+
+        transform.setTransform(mxx, myx, mxy, myy, mxt, myt);
+        graphics.setTransform(mxx, myx, mxy, myy, mxt, myt);
+        updateClip();
+    }
+
+    @Override
+    public void setTransform(Affine xform) {
+        if (xform == null) {
+            return;
+        }
+
+        setTransform(
+            xform.getMxx(), xform.getMyx(),
+            xform.getMxy(), xform.getMyy(),
+            xform.getTx(), xform.getTy()
+        );
+    }
+
+    @Override
+    public void translate(double x, double y) {
+        Affine2D t = new Affine2D(transform);
+
+        t.translate(x, y);
+        applyTransform(t);
+    }
+
+    @Override
+    public void scale(double x, double y) {
+        Affine2D t = new Affine2D(transform);
+
+        t.scale(x, y);
+        applyTransform(t);
+    }
+
+    @Override
+    public void rotate(double degrees) {
+        Affine2D t = new Affine2D(transform);
+
+        t.rotate(Math.toRadians(degrees));
+        applyTransform(t);
+    }
+
+    @Override
+    public void transform(
+        double mxx, double myx,
+        double mxy, double myy,
+        double mxt, double myt
+    ) {
+        Affine2D t = new Affine2D(transform);
+
+        t.concatenate(mxx, mxy, mxt, myx, myy, myt);
+        applyTransform(t);
+    }
+
+    @Override
+    public void transform(Affine xform) {
+        if (xform == null) {
+            return;
+        }
+
+        Affine2D t = new Affine2D(transform);
+
+        t.concatenate(
+            xform.getMxx(), xform.getMxy(), xform.getTx(),
+            xform.getMyx(), xform.getMyy(), xform.getTy()
+        );
+        applyTransform(t);
+    }
+
+    private void applyTransform(BaseTransform result) {
+        setTransform(
+            result.getMxx(), result.getMyx(),
+            result.getMxy(), result.getMyy(),
+            result.getMxt(), result.getMyt()
+        );
+    }
+
+    @Override
+    public void clipRect(double x, double y, double w, double h) {
+        if (transform.getMxy() != 0 || transform.getMyx() != 0) {
+            throw new UnsupportedOperationException("clipping is not supported under a transform with rotation or shear");
+        }
+
+        double x1 = Math.floor(Math.min(x, x + w));
+        double y1 = Math.floor(Math.min(y, y + h));
+        double x2 = Math.ceil(Math.max(x, x + w));
+        double y2 = Math.ceil(Math.max(y, y + h));
+        Rectangle r = new Rectangle((int) x1, (int) y1, (int) (x2 - x1), (int) (y2 - y1));
+
+        if (clip == null) {
+            clip = r;
+        }
+        else {
+            clip.intersectWith(r);
+        }
+
+        updateClip();
+    }
+
+    private void updateClip() {
+        if (clip == null) {
+            graphics.setClipRect(null);
+        }
+        else {
+            Rectangle deviceClip = transformRect(
+                clip.x, clip.y,
+                clip.x + clip.width, clip.y + clip.height
+            );
+
+            graphics.setClipRect(deviceClip != null ? deviceClip : new Rectangle(0, 0, 0, 0));
+        }
+    }
+
+    private Rectangle transformRect(double x1, double y1, double x2, double y2) {
+        double[] src = {x1, y1, x2, y1, x1, y2, x2, y2};
+        double[] dst = new double[8];
+
+        transform.transform(src, 0, dst, 0, 4);
+
+        double minX = Math.max(0, Math.floor(Math.min(Math.min(dst[0], dst[2]), Math.min(dst[4], dst[6]))));
+        double minY = Math.max(0, Math.floor(Math.min(Math.min(dst[1], dst[3]), Math.min(dst[5], dst[7]))));
+        double maxX = Math.min(imageWidth, Math.ceil(Math.max(Math.max(dst[0], dst[2]), Math.max(dst[4], dst[6]))));
+        double maxY = Math.min(imageHeight, Math.ceil(Math.max(Math.max(dst[1], dst[3]), Math.max(dst[5], dst[7]))));
+
+        if (maxX <= minX || maxY <= minY) {
+            return null;
+        }
+
+        return new Rectangle((int) minX, (int) minY, (int) (maxX - minX), (int) (maxY - minY));
+    }
+
+    @Override
+    public void save() {
+        stateStack.push(new State(
+            globalAlpha, globalBlendMode, fill, stroke, lineWidth, lineCap, lineJoin,
+            miterLimit, fillRule, imageSmoothing,
+            font, textAlign, textBaseline, fontSmoothingType,
+            transform.getMxx(), transform.getMyx(), transform.getMxy(), transform.getMyy(),
+            transform.getMxt(), transform.getMyt(),
+            clip != null ? new Rectangle(clip) : null
+        ));
+    }
+
+    @Override
+    public void restore() {
+        if (stateStack.isEmpty()) {
+            return;
+        }
+
+        State s = stateStack.pop();
+
+        clip = s.clip() != null ? new Rectangle(s.clip()) : null;
+
+        setTransform(s.mxx(), s.myx(), s.mxy(), s.myy(), s.mxt(), s.myt());
+        setGlobalAlpha(s.globalAlpha());
+        setGlobalBlendMode(s.globalBlendMode());
+        setFill(s.fill());
+        setStroke(s.stroke());
+        setLineWidth(s.lineWidth());
+        setLineCap(s.lineCap());
+        setLineJoin(s.lineJoin());
+        setMiterLimit(s.miterLimit());
+        setFont(s.font());
+        setTextAlign(s.textAlign());
+        setTextBaseline(s.textBaseline());
+        setFontSmoothingType(s.fontSmoothingType());
+        setFillRule(s.fillRule());
+        setImageSmoothing(s.imageSmoothing());
+    }
+
+    @Override
     public void strokeLine(double x1, double y1, double x2, double y2) {
         applyStrokeParameters();
 
         graphics.drawLine((float)x1, (float)y1, (float)x2, (float)y2);
 
-        markStrokeRectDirty(x1, y1, Math.abs(x2 - x1), Math.abs(y2 - y1));
+        markStrokeRectDirty(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
     }
 
     @Override
     public void strokeRect(double x, double y, double w, double h) {
-        if(w != 0 || h != 0) {
+        if (w != 0 || h != 0) {
             applyStrokeParameters();
 
             graphics.drawRect((float)x, (float)y, (float)w, (float)h);
@@ -321,7 +577,7 @@ public class SWDrawingContext implements DrawingContext {
     @Override
     public void clearRect(double x, double y, double w, double h) {
         if (w != 0 && h != 0) {
-            graphics.clearQuad((float)x, (float)y, (float)(x + w), (float)(x + h));
+            graphics.clearQuad((float)x, (float)y, (float)(x + w), (float)(y + h));
 
             markRectDirty(x, y, w, h);
         }
@@ -488,6 +744,172 @@ public class SWDrawingContext implements DrawingContext {
     }
 
     @Override
+    public Font getFont() {
+        return font;
+    }
+
+    @Override
+    public void setFont(Font f) {
+        if (f != null) {
+            font = f;
+        }
+    }
+
+    @Override
+    public TextAlignment getTextAlign() {
+        return textAlign;
+    }
+
+    @Override
+    public void setTextAlign(TextAlignment align) {
+        if (align != null) {
+            textAlign = align;
+        }
+    }
+
+    @Override
+    public VPos getTextBaseline() {
+        return textBaseline;
+    }
+
+    @Override
+    public void setTextBaseline(VPos baseline) {
+        if (baseline != null) {
+            textBaseline = baseline;
+        }
+    }
+
+    @Override
+    public void setFontSmoothingType(FontSmoothingType fontsmoothing) {
+        if (fontsmoothing != null) {
+            fontSmoothingType = fontsmoothing;
+        }
+    }
+
+    @Override
+    public FontSmoothingType getFontSmoothingType() {
+        return fontSmoothingType;
+    }
+
+    @Override
+    public void fillText(String text, double x, double y) {
+        drawText(text, x, y, 0, false);
+    }
+
+    @Override
+    public void fillText(String text, double x, double y, double maxWidth) {
+        drawText(text, x, y, maxWidth, false);
+    }
+
+    @Override
+    public void strokeText(String text, double x, double y) {
+        drawText(text, x, y, 0, true);
+    }
+
+    @Override
+    public void strokeText(String text, double x, double y, double maxWidth) {
+        drawText(text, x, y, maxWidth, true);
+    }
+
+    private void drawText(String text, double x, double y, double maxWidth, boolean stroke) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+
+        TextLayout layout = PrismTextLayoutFactory.getFactory().createLayout();
+
+        layout.setContent(text, FontHelper.getNativeFont(font));
+        layout.setAlignment(textAlign.ordinal());
+        layout.setDirection(TextLayout.DIRECTION_LTR);
+
+        BaseBounds bounds = layout.getBounds();
+        float layoutWidth = bounds.getWidth();
+        float layoutHeight = bounds.getHeight();
+
+        float xAlign = switch (textAlign) {
+            case RIGHT -> layoutWidth;
+            case CENTER -> layoutWidth / 2;
+            default -> 0;
+        };
+
+        float yAlign = switch (textBaseline) {
+            case BASELINE -> -bounds.getMinY();
+            case CENTER -> layoutHeight / 2;
+            case BOTTOM -> layoutHeight;
+            default -> 0;
+        };
+
+        float scaleX = 1;
+        float layoutX = (float) (x - xAlign);
+
+        if (maxWidth > 0 && layoutWidth > maxWidth) {
+            scaleX = (float) (maxWidth / layoutWidth);
+            layoutX = (float) (x / scaleX - xAlign);
+        }
+
+        float layoutY = (float) (y - yAlign);
+
+        Affine2D textTx = new Affine2D();
+
+        textTx.setTransform(
+            transform.getMxx() * scaleX, transform.getMyx() * scaleX,
+            transform.getMxy(), transform.getMyy(),
+            transform.getMxt(), transform.getMyt()
+        );
+
+        graphics.setTransform(textTx);
+
+        PGFont pgFont = (PGFont) FontHelper.getNativeFont(font);
+        int smoothing = fontSmoothingType == FontSmoothingType.LCD ? FontResource.AA_LCD : FontResource.AA_GREYSCALE;
+        FontStrike strike = pgFont.getStrike(textTx, smoothing);
+
+        if (stroke) {
+            applyStrokeParameters();
+        }
+        else {
+            graphics.setPaint(prismFillPaint);
+        }
+
+        GlyphList[] runs = layout.getRuns();
+        float dirtyMinX = Float.POSITIVE_INFINITY;
+        float dirtyMinY = Float.POSITIVE_INFINITY;
+        float dirtyMaxX = Float.NEGATIVE_INFINITY;
+        float dirtyMaxY = Float.NEGATIVE_INFINITY;
+
+        for (GlyphList run : runs) {
+            if (run.getGlyphCount() == 0) {
+                continue;
+            }
+
+            Point2D pt = run.getLocation();
+            RectBounds lineBounds = run.getLineBounds();
+            float runX = pt.x + layoutX;
+            float runY = pt.y + layoutY - lineBounds.getMinY();
+
+            if (stroke) {
+                graphics.draw(strike.getOutline(run, BaseTransform.getTranslateInstance(runX, runY)));
+            }
+            else {
+                graphics.drawString(run, strike, runX, runY, null, 0, 0);
+            }
+
+            dirtyMinX = Math.min(dirtyMinX, runX);
+            dirtyMaxX = Math.max(dirtyMaxX, runX + run.getWidth());
+            dirtyMinY = Math.min(dirtyMinY, runY + lineBounds.getMinY());
+            dirtyMaxY = Math.max(dirtyMaxY, runY + lineBounds.getMaxY());
+        }
+
+        graphics.setTransform(transform);
+
+        if (dirtyMinX != Float.POSITIVE_INFINITY) {
+            markRectDirty(
+                scaleX * dirtyMinX, dirtyMinY,
+                scaleX * (dirtyMaxX - dirtyMinX), dirtyMaxY - dirtyMinY
+            );
+        }
+    }
+
+    @Override
     public void drawImage(Image img, double sx, double sy, double sw, double sh, double dx, double dy, double dw, double dh) {
         if (img == null || img.getProgress() < 1.0) {
             return;
@@ -546,19 +968,16 @@ public class SWDrawingContext implements DrawingContext {
     }
 
     private void markStrokeRectDirty(double x, double y, double w, double h) {
-        // Base half-width expansion
+        // Expand area by half the stroke width:
         double halfWidth = lineWidth * 0.5;
 
-        // Determine additional expansion factor based on caps and joins
+        // Expand further based on caps and joins:
         double expansionFactor = switch (lineJoin) {
             case MITER -> Math.max(miterLimit, lineCap == StrokeLineCap.SQUARE ? SQRT2 : 1.0);
             case BEVEL, ROUND -> lineCap == StrokeLineCap.SQUARE ? SQRT2 : 1.0;
         };
 
-        // Total expansion radius
         double r = halfWidth * expansionFactor;
-
-        // Expand the rectangle
         double dirtyX = x - r;
         double dirtyY = y - r;
         double dirtyW = w + r * 2.0;
@@ -570,9 +989,13 @@ public class SWDrawingContext implements DrawingContext {
     // TODO It seems bufferDirty only remembers the last rect; may need to update this only once per frame
     // Note: if called multiple times per frame, then it just updates everything (optimize?)
     private void markRectDirty(double x, double y, double w, double h) {
-        int fx = (int)Math.floor(x);
-        int fy = (int)Math.floor(y);
+        Rectangle r = transformRect(
+            Math.min(x, x + w), Math.min(y, y + h),
+            Math.max(x, x + w), Math.max(y, y + h)
+        );
 
-        pixelsDirty.accept(new Rectangle(fx, fy, (int)Math.ceil(x + w) - fx, (int)Math.ceil(y + h) - fy));
+        if (r != null) {
+            pixelsDirty.accept(r);
+        }
     }
 }

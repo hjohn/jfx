@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,9 +25,9 @@
 
 package javafx.scene.image;
 
+import javafx.geometry.VPos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
 import javafx.scene.effect.BlendMode;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
@@ -35,23 +35,24 @@ import javafx.scene.shape.ArcType;
 import javafx.scene.shape.FillRule;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontSmoothingType;
+import javafx.scene.text.TextAlignment;
+import javafx.scene.transform.Affine;
 
 /**
  * Interface providing basic drawing operations. An instance of this interface
- * is provided by {@link WritableImage} and {@link Canvas} via {@link WritableImage#getDrawingContext()}
- * and {@link Canvas#getGraphicsContext2D()}.
+ * is provided by {@link WritableImage} and {@link javafx.scene.canvas.Canvas} via {@link WritableImage#getDrawingContext()}
+ * and {@link javafx.scene.canvas.Canvas#getGraphicsContext2D()}.
  * <p>
  * The provider of this interface may be associated with a {@link Node} which may
- * be attached to a {@link Scene}. If the associated node is not attached to any scene,
- * then the operations provided here can be used from any thread, as long as it is only
- * used from one thread at a time. Once the node is attached to a scene, the operations must
- * be called from the JavaFX Application Thread.
- * <p>
- * TODO A {@code DrawingContext} also manages a stack of state objects that can
- * be saved or restored at anytime.
+ * be attached to a {@link Scene}. The operations provided here must be called from the
+ * JavaFX Application Thread. A provider that is not associated with any scene may permit
+ * the operations to be called from any single other thread.
  * <p>
  * The {@code DrawingContext} maintains the following rendering attributes
  * which affect various subsets of the rendering methods:
+ * <p>
  * <table class="overviewSummary" style="width:80%; margin-left:auto; margin-right:auto">
  * <caption>List of Rendering Attributes</caption>
  * <tr>
@@ -61,6 +62,13 @@ import javafx.scene.shape.StrokeLineJoin;
  * <th class="colLast" scope="col">Description</th>
  * </tr>
  * <tr><th colspan="3" scope="row"><a id="comm-attr">Common Rendering Attributes</a></th></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #clipRect(double, double, double, double) Clip}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">No clipping</td>
+ * <td class="colLast">
+ * An intersection of clipping rectangles to which rendering is restricted.
+ * </td></tr>
  * <tr class="altColor">
  * <th scope="row" class="colLast" style="width:15%">{@link #setGlobalAlpha(double) Global Alpha}</th>
  * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
@@ -76,6 +84,14 @@ import javafx.scene.shape.StrokeLineJoin;
  * <td class="colLast">
  * A {@link BlendMode} enum value that controls how pixels from each rendering
  * operation are composited into the existing image.
+ * </td></tr>
+ * <tr class="altColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #setTransform(javafx.scene.transform.Affine) Transform}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">{@code Identity}</td>
+ * <td class="colLast">
+ * A 3x2 2D affine transformation matrix that controls how coordinates are
+ * mapped onto the logical pixels of the drawing surface.
  * </td></tr>
  * <tr><th colspan="3" scope="row"><a id="fill-attr">Fill Attributes</a></th></tr>
  * <tr class="rowColor">
@@ -129,6 +145,38 @@ import javafx.scene.shape.StrokeLineJoin;
  * boundary path of a shape, relative to the line width, before it is truncated
  * to a {@link StrokeLineJoin#BEVEL BEVEL} join in a stroke operation.
  * </td></tr>
+ * <tr><th colspan="3" scope="row"><a id="text-attr">Text Attributes</a></th></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #setFont(javafx.scene.text.Font) Font}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">{@link Font#getDefault() Default Font}</td>
+ * <td class="colLast">
+ * The font used for all fill and stroke text operations.
+ * </td></tr>
+ * <tr class="altColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #setTextAlign(javafx.scene.text.TextAlignment) Text Align}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">{@link TextAlignment#LEFT LEFT}</td>
+ * <td class="colLast">
+ * The horizontal alignment of text with respect to the {@code X} coordinate
+ * specified in the text operation.
+ * </td></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #setTextBaseline(javafx.geometry.VPos) Text Baseline}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">{@link VPos#BASELINE BASELINE}</td>
+ * <td class="colLast">
+ * The vertical position of the text relative to the {@code Y} coordinate
+ * specified in the text operation.
+ * </td></tr>
+ * <tr class="altColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #setFontSmoothingType(javafx.scene.text.FontSmoothingType) Font Smoothing}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">{@link FontSmoothingType#GRAY GRAY}</td>
+ * <td class="colLast">
+ * The type of smoothing (antialiasing) applied to the glyphs in the font
+ * for all fill text operations.
+ * </td></tr>
  * <tr><th colspan="3" scope="row"><a id="path-attr">Path Attributes</a></th></tr>
  * <tr class="altColor">
  * <th scope="row" class="colLast" style="width:15%">{@link #setFillRule(javafx.scene.shape.FillRule) Fill Rule}</th>
@@ -153,6 +201,7 @@ import javafx.scene.shape.StrokeLineJoin;
  * The various rendering methods on the {@code DrawingContext} use the
  * following sets of rendering attributes:
  * </a>
+ * <p>
  * <table class="overviewSummary" style="width:80%; margin-left:auto; margin-right:auto">
  * <caption>Rendering Attributes Table</caption>
  * <tr>
@@ -160,6 +209,7 @@ import javafx.scene.shape.StrokeLineJoin;
  * <th scope="col" class="colLast" style="width:13%; text-align:center"><a href="#comm-attr">Common Rendering Attributes</a></th>
  * <th scope="col" class="colLast" style="width:13%; text-align:center"><a href="#fill-attr">Fill Attributes</a></th>
  * <th scope="col" class="colLast" style="width:13%; text-align:center"><a href="#strk-attr">Stroke Attributes</a></th>
+ * <th scope="col" class="colLast" style="width:13%; text-align:center"><a href="#text-attr">Text Attributes</a></th>
  * <th scope="col" class="colLast" style="width:13%; text-align:center"><a href="#path-attr">Path Attributes</a></th>
  * <th scope="col" class="colLast" style="width:13%; text-align:center"><a href="#image-attr">Image Attributes</a></th>
  * </tr>
@@ -173,6 +223,7 @@ import javafx.scene.shape.StrokeLineJoin;
  * </th>
  * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
@@ -190,12 +241,14 @@ import javafx.scene.shape.StrokeLineJoin;
  * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * </tr>
  * <tr class="rowColor">
  * <th scope="row" class="colLast" style="width:22%">
  * {@link #clearRect(double, double, double, double) clearRect()}
  * </th>
- * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#base-fn-1">[1]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
@@ -208,7 +261,8 @@ import javafx.scene.shape.StrokeLineJoin;
  * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
- * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#base-fn-2">[1]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#base-fn-2">[2]</a></td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * </tr>
  * <tr class="rowColor">
@@ -221,9 +275,39 @@ import javafx.scene.shape.StrokeLineJoin;
  * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * </tr>
- * <tr><th scope="row" colspan="6">
- * <a id="base-fn-2">[1]</a> Only the Fill Rule applies to fillPolygon()
+ * <tr><th scope="row" colspan="7">
+ * <a id="base-fn-1">[1]</a> Only the Transform and Clip apply to clearRect()<br>
+ * <a id="base-fn-2">[2]</a> Only the Fill Rule applies to fillPolygon()
+ * </th></tr>
+ * <tr><th scope="row" colspan="1">Text Rendering</th></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:22%">
+ * {@link #fillText(java.lang.String, double, double) fillText()},
+ * {@link #fillText(java.lang.String, double, double, double) fillText(with maxWidth)}
+ * </th>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#text-fn-3">[3]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * </tr>
+ * <tr class="altColor">
+ * <th scope="row" class="colLast" style="width:22%">
+ * {@link #strokeText(java.lang.String, double, double) strokeText()},
+ * {@link #strokeText(java.lang.String, double, double, double) strokeText(with maxWidth)}
+ * </th>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#text-fn-3">[3]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * </tr>
+ * <tr><th scope="row" colspan="7">
+ * <a id="text-fn-3">[3]</a> The Font Smoothing attribute only applies to filled text
  * </th></tr>
  * <tr><th scope="row" colspan="1">Image Rendering</th></tr>
  * <tr class="rowColor">
@@ -234,11 +318,12 @@ import javafx.scene.shape.StrokeLineJoin;
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
  * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
  * </tr>
  * </table>
- *
- * <p>Example:</p>
+ * <p>
+ * Example:
  *
  * <pre>
  * import javafx.scene.*;
@@ -255,562 +340,903 @@ import javafx.scene.shape.StrokeLineJoin;
  * c.fillRect(75,75,100,100);
  * </pre>
  *
- * @see Canvas
  * @see WritableImage
- * @since 26
+ * @since 28
  */
 public interface DrawingContext {
 
-  /**
-   * Gets the current stroke.
-   * The default value is {@link Color#BLACK BLACK}.
-   * The stroke paint is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return the {@code Paint} to be used as the stroke {@code Paint}.
-   */
-  Paint getStroke();
+    /**
+     * Gets the current stroke.
+     * The default value is {@link Color#BLACK BLACK}.
+     * The stroke paint is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return the {@code Paint} to be used as the stroke {@code Paint}.
+     */
+    Paint getStroke();
 
-  /**
-   * Sets the current stroke paint attribute.
-   * The default value is {@link Color#BLACK BLACK}.
-   * The stroke paint is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * A {@code null} value will be ignored and the current value will remain unchanged.
-   *
-   * @param p The Paint to be used as the stroke Paint or null.
-   */
-  void setStroke(Paint p);
+    /**
+     * Sets the current stroke paint attribute.
+     * The default value is {@link Color#BLACK BLACK}.
+     * The stroke paint is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     *
+     * @param p The Paint to be used as the stroke Paint or null.
+     */
+    void setStroke(Paint p);
 
-  /**
-   * Gets the current fill paint attribute.
-   * The default value is {@link Color#BLACK BLACK}.
-   * The fill paint is a <a href="#fill-attr">fill attribute</a>
-   * used for any of the fill methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return The {@code Paint} to be used as the fill {@code Paint}.
-   */
-  Paint getFill();
+    /**
+     * Gets the current fill paint attribute.
+     * The default value is {@link Color#BLACK BLACK}.
+     * The fill paint is a <a href="#fill-attr">fill attribute</a>
+     * used for any of the fill methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return The {@code Paint} to be used as the fill {@code Paint}.
+     */
+    Paint getFill();
 
-  /**
-   * Sets the current fill paint attribute.
-   * The default value is {@link Color#BLACK BLACK}.
-   * The fill paint is a <a href="#fill-attr">fill attribute</a>
-   * used for any of the fill methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * A {@code null} value will be ignored and the current value will remain unchanged.
-   *
-   * @param p The {@code Paint} to be used as the fill {@code Paint} or null.
-   */
-  void setFill(Paint p);
+    /**
+     * Sets the current fill paint attribute.
+     * The default value is {@link Color#BLACK BLACK}.
+     * The fill paint is a <a href="#fill-attr">fill attribute</a>
+     * used for any of the fill methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     *
+     * @param p The {@code Paint} to be used as the fill {@code Paint} or null.
+     */
+    void setFill(Paint p);
 
-  /**
-   * Gets the current global alpha.
-   * The default value is {@code 1.0}.
-   * The global alpha is a <a href="#comm-attr">common attribute</a>
-   * used for nearly all rendering methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return the current global alpha.
-   */
-  double getGlobalAlpha();
+    /**
+     * Gets the current global alpha.
+     * The default value is {@code 1.0}.
+     * The global alpha is a <a href="#comm-attr">common attribute</a>
+     * used for nearly all rendering methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return the current global alpha.
+     */
+    double getGlobalAlpha();
 
-  /**
-   * Sets the global alpha of the current state.
-   * The default value is {@code 1.0}.
-   * Any valid double can be set, but only values in the range
-   * {@code [0.0, 1.0]} are valid and the nearest value in that
-   * range will be used for rendering.
-   * The global alpha is a <a href="#comm-attr">common attribute</a>
-   * used for nearly all rendering methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @param alpha the new alpha value, clamped to {@code [0.0, 1.0]}
-   *              during actual use.
-   */
-  void setGlobalAlpha(double alpha);
+    /**
+     * Sets the global alpha of the current state.
+     * The default value is {@code 1.0}.
+     * Any valid double can be set, but only values in the range
+     * {@code [0.0, 1.0]} are valid and the nearest value in that
+     * range will be used for rendering.
+     * The global alpha is a <a href="#comm-attr">common attribute</a>
+     * used for nearly all rendering methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param alpha the new alpha value, clamped to {@code [0.0, 1.0]}
+     *              during actual use.
+     */
+    void setGlobalAlpha(double alpha);
 
-  /**
-   * Gets the global blend mode.
-   * The default value is {@link BlendMode#SRC_OVER SRC_OVER}.
-   * The blend mode is a <a href="#comm-attr">common attribute</a>
-   * used for nearly all rendering methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return the global {@code BlendMode} of the current state.
-   */
-  BlendMode getGlobalBlendMode();
+    /**
+     * Gets the global blend mode.
+     * The default value is {@link BlendMode#SRC_OVER SRC_OVER}.
+     * The blend mode is a <a href="#comm-attr">common attribute</a>
+     * used for nearly all rendering methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return the global {@code BlendMode} of the current state.
+     */
+    BlendMode getGlobalBlendMode();
 
-  /**
-   * Sets the global blend mode.
-   * The default value is {@link BlendMode#SRC_OVER SRC_OVER}.
-   * A {@code null} value will be ignored and the current value will remain unchanged.
-   * The blend mode is a <a href="#comm-attr">common attribute</a>
-   * used for nearly all rendering methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @param op the {@code BlendMode} that will be set or null.
-   */
-  void setGlobalBlendMode(BlendMode op);
+    /**
+     * Sets the global blend mode.
+     * The default value is {@link BlendMode#SRC_OVER SRC_OVER}.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * The blend mode is a <a href="#comm-attr">common attribute</a>
+     * used for nearly all rendering methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param op the {@code BlendMode} that will be set or null.
+     * @throws UnsupportedOperationException if the given blend mode is not supported by this implementation
+     */
+    void setGlobalBlendMode(BlendMode op);
 
-  /**
-   * Get the filling rule attribute for determining the interior of paths
-   * in fill and clip operations.
-   * The default value is {@code FillRule.NON_ZERO}.
-   * The fill rule is a <a href="#path-attr">path attribute</a>
-   * used for any of the fill or clip path methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return current fill rule.
-   */
-  FillRule getFillRule();
+    /**
+     * Get the filling rule attribute for determining the interior of paths
+     * in fill and clip operations.
+     * The default value is {@code FillRule.NON_ZERO}.
+     * The fill rule is a <a href="#path-attr">path attribute</a>
+     * used for any of the fill or clip path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return current fill rule.
+     */
+    FillRule getFillRule();
 
-  /**
-   * Set the filling rule attribute for determining the interior of paths
-   * in fill or clip operations.
-   * The default value is {@code FillRule.NON_ZERO}.
-   * A {@code null} value will be ignored and the current value will remain unchanged.
-   * The fill rule is a <a href="#path-attr">path attribute</a>
-   * used for any of the fill or clip path methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @param fillRule {@code FillRule} with a value of Even_odd or Non_zero or null.
-   */
-  void setFillRule(FillRule fillRule);
+    /**
+     * Set the filling rule attribute for determining the interior of paths
+     * in fill or clip operations.
+     * The default value is {@code FillRule.NON_ZERO}.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * The fill rule is a <a href="#path-attr">path attribute</a>
+     * used for any of the fill or clip path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param fillRule {@code FillRule} with a value of Even_odd or Non_zero or null.
+     */
+    void setFillRule(FillRule fillRule);
 
-  /**
-   * Gets the current line width.
-   * The default value is {@code 1.0}.
-   * The line width is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return value between 0 and infinity.
-   */
-  double getLineWidth();
+    /**
+     * Gets the current line width.
+     * The default value is {@code 1.0}.
+     * The line width is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return value between 0 and infinity.
+     */
+    double getLineWidth();
 
-  /**
-   * Sets the current line width.
-   * The default value is {@code 1.0}.
-   * The line width is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * An infinite or non-positive value outside of the range {@code (0, +inf)}
-   * will be ignored and the current value will remain unchanged.
-   *
-   * @param lw value in the range {0-positive infinity}, with any other value
-   * being ignored and leaving the value unchanged.
-   */
-  void setLineWidth(double lw);
+    /**
+     * Sets the current line width.
+     * The default value is {@code 1.0}.
+     * The line width is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * An infinite or non-positive value outside of the range {@code (0, +inf)}
+     * will be ignored and the current value will remain unchanged.
+     *
+     * @param lw value in the range {0-positive infinity}, with any other value
+     * being ignored and leaving the value unchanged.
+     */
+    void setLineWidth(double lw);
 
-  /**
-   * Gets the current stroke line cap.
-   * The default value is {@link StrokeLineCap#SQUARE SQUARE}.
-   * The line cap is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return {@code StrokeLineCap} with a value of Butt, Round, or Square.
-   */
-  StrokeLineCap getLineCap();
+    /**
+     * Gets the current stroke line cap.
+     * The default value is {@link StrokeLineCap#SQUARE SQUARE}.
+     * The line cap is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return {@code StrokeLineCap} with a value of Butt, Round, or Square.
+     */
+    StrokeLineCap getLineCap();
 
-  /**
-   * Sets the current stroke line cap.
-   * The default value is {@link StrokeLineCap#SQUARE SQUARE}.
-   * The line cap is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * A {@code null} value will be ignored and the current value will remain unchanged.
-   *
-   * @param cap {@code StrokeLineCap} with a value of Butt, Round, or Square or null.
-   */
-  void setLineCap(StrokeLineCap cap);
+    /**
+     * Sets the current stroke line cap.
+     * The default value is {@link StrokeLineCap#SQUARE SQUARE}.
+     * The line cap is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     *
+     * @param cap {@code StrokeLineCap} with a value of Butt, Round, or Square or null.
+     */
+    void setLineCap(StrokeLineCap cap);
 
-  /**
-   * Gets the current stroke line join.
-   * The default value is {@link StrokeLineJoin#MITER}.
-   * The line join is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return {@code StrokeLineJoin} with a value of Miter, Bevel, or Round.
-   */
-  StrokeLineJoin getLineJoin();
+    /**
+     * Gets the current stroke line join.
+     * The default value is {@link StrokeLineJoin#MITER}.
+     * The line join is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return {@code StrokeLineJoin} with a value of Miter, Bevel, or Round.
+     */
+    StrokeLineJoin getLineJoin();
 
-  /**
-   * Sets the current stroke line join.
-   * The default value is {@link StrokeLineJoin#MITER}.
-   * The line join is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * A {@code null} value will be ignored and the current value will remain unchanged.
-   *
-   * @param join {@code StrokeLineJoin} with a value of Miter, Bevel, or Round or null.
-   */
-  void setLineJoin(StrokeLineJoin join);
+    /**
+     * Sets the current stroke line join.
+     * The default value is {@link StrokeLineJoin#MITER}.
+     * The line join is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     *
+     * @param join {@code StrokeLineJoin} with a value of Miter, Bevel, or Round or null.
+     */
+    void setLineJoin(StrokeLineJoin join);
 
-  /**
-   * Gets the current miter limit.
-   * The default value is {@code 10.0}.
-   * The miter limit is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   *
-   * @return the miter limit value in the range {@code 0.0-positive infinity}
-   */
-  double getMiterLimit();
+    /**
+     * Gets the current miter limit.
+     * The default value is {@code 10.0}.
+     * The miter limit is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return the miter limit value in the range {@code 0.0-positive infinity}
+     */
+    double getMiterLimit();
 
-  /**
-   * Sets the current miter limit.
-   * The default value is {@code 10.0}.
-   * The miter limit is a <a href="#strk-attr">stroke attribute</a>
-   * used for any of the stroke methods as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * An infinite or non-positive value outside of the range {@code (0, +inf)}
-   * will be ignored and the current value will remain unchanged.
-   *
-   * @param ml miter limit value between 0 and positive infinity with
-   * any other value being ignored and leaving the value unchanged.
-   */
-  void setMiterLimit(double ml);
+    /**
+     * Sets the current miter limit.
+     * The default value is {@code 10.0}.
+     * The miter limit is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * An infinite or non-positive value outside of the range {@code (0, +inf)}
+     * will be ignored and the current value will remain unchanged.
+     *
+     * @param ml miter limit value between 0 and positive infinity with
+     * any other value being ignored and leaving the value unchanged.
+     */
+    void setMiterLimit(double ml);
 
-  /**
-   * Gets the current image smoothing state.
-   *
-   * @defaultValue {@code true}
-   * @return image smoothing state
-   */
-  boolean isImageSmoothing();
+    /**
+     * Gets the current image smoothing state.
+     *
+     * @defaultValue {@code true}
+     * @return image smoothing state
+     */
+    boolean isImageSmoothing();
 
-  /**
-   * Sets the image smoothing state.
-   * Image smoothing is an <a href="#image-attr">Image attribute</a>
-   * used to enable or disable image smoothing for
-   * {@link #drawImage(javafx.scene.image.Image, double, double) drawImage(all forms)}
-   * as specified in the <a href="#attr-ops-table">Rendering Attributes Table</a>.<br>
-   * If image smoothing is {@code true}, images will be scaled using a higher
-   * quality filtering when transforming or scaling the source image to fit
-   * in the destination rectangle.<br>
-   * If image smoothing is {@code false}, images will be scaled without filtering
-   * (or by using a lower quality filtering) when transforming or scaling the
-   * source image to fit in the destination rectangle.
-   *
-   * @defaultValue {@code true}
-   * @param imageSmoothing {@code true} to enable or {@code false} to disable smoothing
-   */
-  void setImageSmoothing(boolean imageSmoothing);
+    /**
+     * Sets the image smoothing state.
+     * Image smoothing is an <a href="#image-attr">Image attribute</a>
+     * used to enable or disable image smoothing for
+     * {@link #drawImage(javafx.scene.image.Image, double, double) drawImage(all forms)}
+     * as specified in the <a href="#attr-ops-table">Rendering Attributes Table</a>.<br>
+     * If image smoothing is {@code true}, images will be scaled using a higher
+     * quality filtering when transforming or scaling the source image to fit
+     * in the destination rectangle.<br>
+     * If image smoothing is {@code false}, images will be scaled without filtering
+     * (or by using a lower quality filtering) when transforming or scaling the
+     * source image to fit in the destination rectangle.
+     *
+     * @defaultValue {@code true}
+     * @param imageSmoothing {@code true} to enable or {@code false} to disable smoothing
+     */
+    void setImageSmoothing(boolean imageSmoothing);
 
-  /**
-   * Strokes a line using the current stroke paint.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#strk-attr">stroke</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x1 the X coordinate of the starting point of the line.
-   * @param y1 the Y coordinate of the starting point of the line.
-   * @param x2 the X coordinate of the ending point of the line.
-   * @param y2 the Y coordinate of the ending point of the line.
-   */
-  void strokeLine(double x1, double y1, double x2, double y2);
+    /**
+     * Returns a copy of the current transform.
+     *
+     * @return a copy of the transform of the current state.
+     */
+    Affine getTransform();
 
-  /**
-   * Strokes a rectangle using the current stroke paint.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#strk-attr">stroke</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X position of the upper left corner of the rectangle.
-   * @param y the Y position of the upper left corner of the rectangle.
-   * @param w the width of the rectangle.
-   * @param h the height of the rectangle.
-   */
-  void strokeRect(double x, double y, double w, double h);
+    /**
+     * Copies the current transform into the supplied object, creating
+     * a new {@link Affine} object if it is null, and returns the object
+     * containing the copy.
+     *
+     * @param xform A transform object that will be used to hold the result.
+     * If xform is non null, then this method will copy the current transform
+     * into that object. If xform is null a new transform object will be
+     * constructed. In either case, the return value is a copy of the current
+     * transform.
+     *
+     * @return A copy of the current transform.
+     */
+    Affine getTransform(Affine xform);
 
-  /**
-   * Clears a portion of the canvas with a transparent color value.
-   * <p>
-   * This method will be affected only by the current transform, clip,
-   * and effect.
-   * </p>
-   *
-   * @param x X position of the upper left corner of the rectangle.
-   * @param y Y position of the upper left corner of the rectangle.
-   * @param w width of the rectangle.
-   * @param h height of the rectangle.
-   */
-  void clearRect(double x, double y, double w, double h);
+    /**
+     * Sets the current transform.
+     * <p>
+     * Implementations may throw {@link UnsupportedOperationException} when a
+     * transform containing rotation or shear is set while a clip is active.
+     *
+     * @param mxx the X coordinate scaling element of the 3x4 matrix
+     * @param myx the Y coordinate shearing element of the 3x4 matrix
+     * @param mxy the X coordinate shearing element of the 3x4 matrix
+     * @param myy the Y coordinate scaling element of the 3x4 matrix
+     * @param mxt the X coordinate translation element of the 3x4 matrix
+     * @param myt the Y coordinate translation element of the 3x4 matrix
+     * @throws UnsupportedOperationException if a transform containing rotation
+     *         or shear is set while a clip is active and the implementation does
+     *         not support such clips
+     */
+    void setTransform(
+        double mxx, double myx,
+        double mxy, double myy,
+        double mxt, double myt
+    );
 
-  /**
-   * Fills a rectangle using the current fill paint.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#fill-attr">fill</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X position of the upper left corner of the rectangle.
-   * @param y the Y position of the upper left corner of the rectangle.
-   * @param w the width of the rectangle.
-   * @param h the height of the rectangle.
-   */
-  void fillRect(double x, double y, double w, double h);
+    /**
+     * Sets the current transform. Only 2D transforms are supported. The only
+     * values used are the X and Y scaling, translation, and shearing components
+     * of a transform.
+     * <p>
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * <p>
+     * Implementations may throw {@link UnsupportedOperationException} when a
+     * transform containing rotation or shear is set while a clip is active.
+     *
+     * @param xform The affine to be copied and used as the current transform.
+     * @throws UnsupportedOperationException if a transform containing rotation
+     *         or shear is set while a clip is active and the implementation does
+     *         not support such clips
+     */
+    void setTransform(Affine xform);
 
-  /**
-   * Strokes a rounded rectangle using the current stroke paint.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#strk-attr">stroke</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X coordinate of the upper left bound of the oval.
-   * @param y the Y coordinate of the upper left bound of the oval.
-   * @param w the width at the center of the oval.
-   * @param h the height at the center of the oval.
-   * @param arcWidth the arc width of the rectangle corners.
-   * @param arcHeight the arc height of the rectangle corners.
-   */
-  void strokeRoundRect(double x, double y, double w, double h, double arcWidth, double arcHeight);
+    /**
+     * Translates the current transform by x, y.
+     * The transform is a <a href="#comm-attr">common attribute</a> used for
+     * nearly all rendering operations as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x value to translate along the x axis.
+     * @param y value to translate along the y axis.
+     */
+    void translate(double x, double y);
 
-  /**
-   * Fills a rounded rectangle using the current fill paint.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#fill-attr">fill</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X coordinate of the upper left bound of the oval.
-   * @param y the Y coordinate of the upper left bound of the oval.
-   * @param w the width at the center of the oval.
-   * @param h the height at the center of the oval.
-   * @param arcWidth the arc width of the rectangle corners.
-   * @param arcHeight the arc height of the rectangle corners.
-   */
-  void fillRoundRect(double x, double y, double w, double h, double arcWidth, double arcHeight);
+    /**
+     * Scales the current transform by x, y.
+     * The transform is a <a href="#comm-attr">common attribute</a> used for
+     * nearly all rendering operations as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x value to scale in the x axis.
+     * @param y value to scale in the y axis.
+     */
+    void scale(double x, double y);
 
-  /**
-   * Strokes an oval using the current stroke paint.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#strk-attr">stroke</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X coordinate of the upper left bound of the oval.
-   * @param y the Y coordinate of the upper left bound of the oval.
-   * @param w the width at the center of the oval.
-   * @param h the height at the center of the oval.
-   */
-  void strokeOval(double x, double y, double w, double h);
+    /**
+     * Rotates the current transform in degrees.
+     * The transform is a <a href="#comm-attr">common attribute</a> used for
+     * nearly all rendering operations as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * <p>
+     * Implementations may throw {@link UnsupportedOperationException} when the
+     * resulting transform contains rotation or shear while a clip is active.
+     *
+     * @param degrees value in degrees to rotate the current transform.
+     * @throws UnsupportedOperationException if the resulting transform contains
+     *         rotation or shear while a clip is active and the implementation does
+     *         not support such clips
+     */
+    void rotate(double degrees);
 
-  /**
-   * Fills an oval using the current fill paint.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#fill-attr">fill</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X coordinate of the upper left bound of the oval.
-   * @param y the Y coordinate of the upper left bound of the oval.
-   * @param w the width at the center of the oval.
-   * @param h the height at the center of the oval.
-   */
-  void fillOval(double x, double y, double w, double h);
+    /**
+     * Concatenates the input with the current transform.
+     * The transform is a <a href="#comm-attr">common attribute</a> used for
+     * nearly all rendering operations as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * <p>
+     * Implementations may throw {@link UnsupportedOperationException} when the
+     * resulting transform contains rotation or shear while a clip is active.
+     *
+     * @param mxx the X coordinate scaling element of the 3x4 matrix
+     * @param myx the Y coordinate shearing element of the 3x4 matrix
+     * @param mxy the X coordinate shearing element of the 3x4 matrix
+     * @param myy the Y coordinate scaling element of the 3x4 matrix
+     * @param mxt the X coordinate translation element of the 3x4 matrix
+     * @param myt the Y coordinate translation element of the 3x4 matrix
+     * @throws UnsupportedOperationException if the resulting transform contains
+     *         rotation or shear while a clip is active and the implementation does
+     *         not support such clips
+     */
+    void transform(
+        double mxx, double myx,
+        double mxy, double myy,
+        double mxt, double myt
+    );
 
-  /**
-   * Strokes an Arc using the current stroke paint. A {@code null} ArcType or
-   * non positive width or height will cause the render command to be ignored.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#strk-attr">stroke</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X coordinate of the arc.
-   * @param y the Y coordinate of the arc.
-   * @param w the width of the arc.
-   * @param h the height of the arc.
-   * @param startAngle the starting angle of the arc in degrees.
-   * @param arcExtent arcExtent the angular extent of the arc in degrees.
-   * @param closure closure type (Round, Chord, Open) or null
-   */
-  void strokeArc(double x, double y, double w, double h, double startAngle, double arcExtent, ArcType closure);
+    /**
+     * Concatenates the input with the current transform. Only 2D transforms are
+     * supported. The only values used are the X and Y scaling, translation, and
+     * shearing components of a transform.
+     * <p>
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * <p>
+     * Implementations may throw {@link UnsupportedOperationException} when the
+     * resulting transform contains rotation or shear while a clip is active.
+     *
+     * @param xform The affine to be concatenated with the current transform or null.
+     * @throws UnsupportedOperationException if the resulting transform contains
+     *         rotation or shear while a clip is active and the implementation does
+     *         not support such clips
+     */
+    void transform(Affine xform);
 
-  /**
-   * Fills an arc using the current fill paint. A {@code null} ArcType or
-   * non positive width or height will cause the render command to be ignored.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#fill-attr">fill</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param x the X coordinate of the arc.
-   * @param y the Y coordinate of the arc.
-   * @param w the width of the arc.
-   * @param h the height of the arc.
-   * @param startAngle the starting angle of the arc in degrees.
-   * @param arcExtent the angular extent of the arc in degrees.
-   * @param closure closure type (Round, Chord, Open) or null.
-   */
-  void fillArc(double x, double y, double w, double h, double startAngle, double arcExtent, ArcType closure);
+    /**
+     * Intersects the current clip with the specified rectangle and applies it to
+     * subsequent rendering operations as a clipping mask.
+     * The current clip is a <a href="#comm-attr">common attribute</a>
+     * used for nearly all rendering operations as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * <p>
+     * The rectangle is specified in user coordinates and is transformed by the
+     * current transform.
+     * <p>
+     * Implementations may throw {@link UnsupportedOperationException} when the
+     * current transform contains rotation or shear, since the clip could not be
+     * represented as an axis-aligned rectangle. Implementations that support such
+     * clips exactly will not throw.
+     *
+     * @param x the X position of the upper left corner of the rectangle
+     * @param y the Y position of the upper left corner of the rectangle
+     * @param w the width of the rectangle
+     * @param h the height of the rectangle
+     * @throws UnsupportedOperationException if the current transform contains
+     *         rotation or shear and the implementation does not support such clips
+     */
+    void clipRect(double x, double y, double w, double h);
 
-  /**
-   * Strokes a polyline with the given points using the currently set stroke
-   * paint attribute.
-   * A {@code null} value for any of the arrays will be ignored and nothing will be drawn.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#strk-attr">stroke</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param xPoints array containing the x coordinates of the polyline's points or null.
-   * @param yPoints array containing the y coordinates of the polyline's points or null.
-   * @param nPoints the number of points that make the polyline.
-   */
-  void strokePolyline(double xPoints[], double yPoints[], int nPoints);
+    /**
+     * Saves the following attributes onto a stack.
+     * <ul>
+     *     <li>Global Alpha</li>
+     *     <li>Global Blend Operation</li>
+     *     <li>Transform</li>
+     *     <li>Fill Paint</li>
+     *     <li>Stroke Paint</li>
+     *     <li>Line Width</li>
+     *     <li>Line Cap</li>
+     *     <li>Line Join</li>
+     *     <li>Miter Limit</li>
+     *     <li>Clip</li>
+     *     <li>Font</li>
+     *     <li>Text Align</li>
+     *     <li>Text Baseline</li>
+     *     <li>Font Smoothing Type</li>
+     *     <li>Image Smoothing</li>
+     *     <li>Fill Rule</li>
+     * </ul>
+     * This method does NOT alter the current state in any way.
+     */
+    void save();
 
-  /**
-   * Strokes a polygon with the given points using the currently set stroke paint.
-   * A {@code null} value for any of the arrays will be ignored and nothing will be drawn.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#strk-attr">stroke</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param xPoints array containing the x coordinates of the polygon's points or null.
-   * @param yPoints array containing the y coordinates of the polygon's points or null.
-   * @param nPoints the number of points that make the polygon.
-   */
-  void strokePolygon(double[] xPoints, double[] yPoints, int nPoints);
+    /**
+     * Pops the state off of the stack, setting the following attributes to their
+     * value at the time when that state was pushed onto the stack. If the stack
+     * is empty then nothing is changed.
+     * <ul>
+     *     <li>Global Alpha</li>
+     *     <li>Global Blend Operation</li>
+     *     <li>Transform</li>
+     *     <li>Fill Paint</li>
+     *     <li>Stroke Paint</li>
+     *     <li>Line Width</li>
+     *     <li>Line Cap</li>
+     *     <li>Line Join</li>
+     *     <li>Miter Limit</li>
+     *     <li>Clip</li>
+     *     <li>Font</li>
+     *     <li>Text Align</li>
+     *     <li>Text Baseline</li>
+     *     <li>Font Smoothing Type</li>
+     *     <li>Image Smoothing</li>
+     *     <li>Fill Rule</li>
+     * </ul>
+     */
+    void restore();
 
-  /**
-   * Fills a polygon with the given points using the currently set fill paint.
-   * A {@code null} value for any of the arrays will be ignored and nothing will be drawn.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>,
-   * <a href="#fill-attr">fill</a>,
-   * or <a href="#path-attr">Fill Rule</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param xPoints array containing the x coordinates of the polygon's points or null.
-   * @param yPoints array containing the y coordinates of the polygon's points or null.
-   * @param nPoints the number of points that make the polygon.
-   */
-  void fillPolygon(double xPoints[], double yPoints[], int nPoints);
+    /**
+     * Strokes a line using the current stroke paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x1 the X coordinate of the starting point of the line.
+     * @param y1 the Y coordinate of the starting point of the line.
+     * @param x2 the X coordinate of the ending point of the line.
+     * @param y2 the Y coordinate of the ending point of the line.
+     */
+    void strokeLine(double x1, double y1, double x2, double y2);
 
-  /**
-   * Draws an image at the given x, y position using the width
-   * and height of the given image.
-   * A {@code null} image value or an image still in progress will be ignored.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#image-attr">image</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param img the image to be drawn or null.
-   * @param x the X coordinate on the destination for the upper left of the image.
-   * @param y the Y coordinate on the destination for the upper left of the image.
-   */
-  default void drawImage(Image img, double x, double y) {
-    if (img == null || img.getProgress() < 1.0) {
-      return;
+    /**
+     * Strokes a rectangle using the current stroke paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X position of the upper left corner of the rectangle.
+     * @param y the Y position of the upper left corner of the rectangle.
+     * @param w the width of the rectangle.
+     * @param h the height of the rectangle.
+     */
+    void strokeRect(double x, double y, double w, double h);
+
+    /**
+     * Clears a portion of the drawing surface with a transparent color value.
+     * <p>
+     * This method is not affected by any of the rendering attributes.
+     *
+     * @param x X position of the upper left corner of the rectangle.
+     * @param y Y position of the upper left corner of the rectangle.
+     * @param w width of the rectangle.
+     * @param h height of the rectangle.
+     */
+    void clearRect(double x, double y, double w, double h);
+
+    /**
+     * Fills a rectangle using the current fill paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#fill-attr">fill</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X position of the upper left corner of the rectangle.
+     * @param y the Y position of the upper left corner of the rectangle.
+     * @param w the width of the rectangle.
+     * @param h the height of the rectangle.
+     */
+    void fillRect(double x, double y, double w, double h);
+
+    /**
+     * Strokes a rounded rectangle using the current stroke paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X coordinate of the upper left bound of the oval.
+     * @param y the Y coordinate of the upper left bound of the oval.
+     * @param w the width at the center of the oval.
+     * @param h the height at the center of the oval.
+     * @param arcWidth the arc width of the rectangle corners.
+     * @param arcHeight the arc height of the rectangle corners.
+     */
+    void strokeRoundRect(double x, double y, double w, double h, double arcWidth, double arcHeight);
+
+    /**
+     * Fills a rounded rectangle using the current fill paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#fill-attr">fill</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X coordinate of the upper left bound of the oval.
+     * @param y the Y coordinate of the upper left bound of the oval.
+     * @param w the width at the center of the oval.
+     * @param h the height at the center of the oval.
+     * @param arcWidth the arc width of the rectangle corners.
+     * @param arcHeight the arc height of the rectangle corners.
+     */
+    void fillRoundRect(double x, double y, double w, double h, double arcWidth, double arcHeight);
+
+    /**
+     * Strokes an oval using the current stroke paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X coordinate of the upper left bound of the oval.
+     * @param y the Y coordinate of the upper left bound of the oval.
+     * @param w the width at the center of the oval.
+     * @param h the height at the center of the oval.
+     */
+    void strokeOval(double x, double y, double w, double h);
+
+    /**
+     * Fills an oval using the current fill paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#fill-attr">fill</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X coordinate of the upper left bound of the oval.
+     * @param y the Y coordinate of the upper left bound of the oval.
+     * @param w the width at the center of the oval.
+     * @param h the height at the center of the oval.
+     */
+    void fillOval(double x, double y, double w, double h);
+
+    /**
+     * Strokes an Arc using the current stroke paint. A {@code null} ArcType or
+     * zero width or height will cause the render command to be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X coordinate of the arc.
+     * @param y the Y coordinate of the arc.
+     * @param w the width of the arc.
+     * @param h the height of the arc.
+     * @param startAngle the starting angle of the arc in degrees.
+     * @param arcExtent arcExtent the angular extent of the arc in degrees.
+     * @param closure closure type (Round, Chord, Open) or null
+     */
+    void strokeArc(double x, double y, double w, double h, double startAngle, double arcExtent, ArcType closure);
+
+    /**
+     * Fills an arc using the current fill paint. A {@code null} ArcType or
+     * zero width or height will cause the render command to be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#fill-attr">fill</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param x the X coordinate of the arc.
+     * @param y the Y coordinate of the arc.
+     * @param w the width of the arc.
+     * @param h the height of the arc.
+     * @param startAngle the starting angle of the arc in degrees.
+     * @param arcExtent the angular extent of the arc in degrees.
+     * @param closure closure type (Round, Chord, Open) or null.
+     */
+    void fillArc(double x, double y, double w, double h, double startAngle, double arcExtent, ArcType closure);
+
+    /**
+     * Strokes a polyline with the given points using the currently set stroke
+     * paint attribute.
+     * A {@code null} value for any of the arrays will be ignored and nothing will be drawn.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param xPoints array containing the x coordinates of the polyline's points or null.
+     * @param yPoints array containing the y coordinates of the polyline's points or null.
+     * @param nPoints the number of points that make the polyline.
+     */
+    void strokePolyline(double xPoints[], double yPoints[], int nPoints);
+
+    /**
+     * Strokes a polygon with the given points using the currently set stroke paint.
+     * A {@code null} value for any of the arrays will be ignored and nothing will be drawn.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param xPoints array containing the x coordinates of the polygon's points or null.
+     * @param yPoints array containing the y coordinates of the polygon's points or null.
+     * @param nPoints the number of points that make the polygon.
+     */
+    void strokePolygon(double[] xPoints, double[] yPoints, int nPoints);
+
+    /**
+     * Fills a polygon with the given points using the currently set fill paint.
+     * A {@code null} value for any of the arrays will be ignored and nothing will be drawn.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>,
+     * <a href="#fill-attr">fill</a>,
+     * or <a href="#path-attr">Fill Rule</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param xPoints array containing the x coordinates of the polygon's points or null.
+     * @param yPoints array containing the y coordinates of the polygon's points or null.
+     * @param nPoints the number of points that make the polygon.
+     */
+    void fillPolygon(double xPoints[], double yPoints[], int nPoints);
+
+    /**
+     * Gets the current font.
+     *
+     * @defaultValue Font.getDefault()
+     * @return the current font
+     */
+    Font getFont();
+
+    /**
+     * Sets the current font.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * The font is a text attribute used for any of the text methods.
+     *
+     * @param f the font to set or null.
+     */
+    void setFont(Font f);
+
+    /**
+     * Gets the current {@code TextAlignment}.
+     *
+     * @defaultValue TextAlignment.LEFT
+     * @return the current {@code TextAlignment}
+     */
+    TextAlignment getTextAlign();
+
+    /**
+     * Sets the current {@code TextAlignment}.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * The text align is a text attribute used for any of the text methods.
+     *
+     * @param align the {@code TextAlignment} to set or null.
+     */
+    void setTextAlign(TextAlignment align);
+
+    /**
+     * Gets the current {@code VPos}.
+     *
+     * @defaultValue VPos.BASELINE
+     * @return the current {@code VPos}
+     */
+    VPos getTextBaseline();
+
+    /**
+     * Sets the current {@code VPos}.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * The text baseline is a text attribute used for any of the text methods.
+     *
+     * @param baseline the {@code VPos} to set or null.
+     */
+    void setTextBaseline(VPos baseline);
+
+    /**
+     * Sets the current Font Smoothing Type.
+     * The default value is {@link FontSmoothingType#GRAY GRAY}.
+     * The font smoothing type is a text attribute used for any of the text methods.
+     * A {@code null} value will be ignored and the current value will remain unchanged.
+     * <p>
+     * <b>Note</b> that the {@code FontSmoothingType} value of
+     * {@link FontSmoothingType#LCD LCD} is only supported over an opaque
+     * background. {@code LCD} text will generally appear as {@code GRAY}
+     * text over transparent or partially transparent pixels, and in some
+     * implementations it may not be supported at all on a surface that
+     * contains an alpha channel.
+     *
+     * @param fontsmoothing the {@link FontSmoothingType} or null.
+     */
+    void setFontSmoothingType(FontSmoothingType fontsmoothing);
+
+    /**
+     * Gets the current Font Smoothing Type.
+     * The default value is {@link FontSmoothingType#GRAY GRAY}.
+     * The font smoothing type is a text attribute used for any of the text methods.
+     *
+     * @return the {@link FontSmoothingType}
+     */
+    FontSmoothingType getFontSmoothingType();
+
+    /**
+     * Fills the given string of text at position x, y
+     * with the current fill paint attribute.
+     * A {@code null} text value will be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#fill-attr">fill</a>
+     * attributes, and by the current font, text alignment, and text baseline.
+     *
+     * @param text the string of text or null.
+     * @param x position on the x axis.
+     * @param y position on the y axis.
+     */
+    void fillText(String text, double x, double y);
+
+    /**
+     * Draws the given string of text at position x, y
+     * with the current stroke paint attribute.
+     * A {@code null} text value will be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes, and by the current font, text alignment, and text baseline.
+     *
+     * @param text the string of text or null.
+     * @param x position on the x axis.
+     * @param y position on the y axis.
+     */
+    void strokeText(String text, double x, double y);
+
+    /**
+     * Fills text and includes a maximum width of the string.
+     * If the width of the text extends past max width, then it will be sized
+     * to fit.
+     * A {@code null} text value will be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#fill-attr">fill</a>
+     * attributes, and by the current font, text alignment, and text baseline.
+     *
+     * @param text the string of text or null.
+     * @param x position on the x axis.
+     * @param y position on the y axis.
+     * @param maxWidth the maximum width of the string.
+     */
+    void fillText(String text, double x, double y, double maxWidth);
+
+    /**
+     * Draws text and includes a maximum width of the string.
+     * If the width of the text extends past max width, then it will be sized
+     * to fit.
+     * A {@code null} text value will be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#strk-attr">stroke</a>
+     * attributes, and by the current font, text alignment, and text baseline.
+     *
+     * @param text the string of text or null.
+     * @param x position on the x axis.
+     * @param y position on the y axis.
+     * @param maxWidth the maximum width of the string.
+     */
+    void strokeText(String text, double x, double y, double maxWidth);
+
+    /**
+     * Draws an image at the given x, y position using the width
+     * and height of the given image.
+     * A {@code null} image value or an image still in progress will be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#image-attr">image</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param img the image to be drawn or null.
+     * @param x the X coordinate on the destination for the upper left of the image.
+     * @param y the Y coordinate on the destination for the upper left of the image.
+     */
+    default void drawImage(Image img, double x, double y) {
+        if (img == null || img.getProgress() < 1.0) {
+            return;
+        }
+
+        drawImage(img, x, y, img.getWidth(), img.getHeight());
     }
 
-    drawImage(img, x, y, img.getWidth(), img.getHeight());
-  }
+    /**
+     * Draws an image into the given destination rectangle of the drawing surface. The
+     * Image is scaled to fit into the destination rectangle.
+     * A {@code null} image value or an image still in progress will be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#image-attr">image</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param img the image to be drawn or null.
+     * @param x the X coordinate on the destination for the upper left of the image.
+     * @param y the Y coordinate on the destination for the upper left of the image.
+     * @param w the width of the destination rectangle.
+     * @param h the height of the destination rectangle.
+     */
+    default void drawImage(Image img, double x, double y, double w, double h) {
+        if (img == null || img.getProgress() < 1.0) {
+            return;
+        }
 
-  /**
-   * Draws an image into the given destination rectangle of the canvas. The
-   * Image is scaled to fit into the destination rectangle.
-   * A {@code null} image value or an image still in progress will be ignored.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#image-attr">image</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param img the image to be drawn or null.
-   * @param x the X coordinate on the destination for the upper left of the image.
-   * @param y the Y coordinate on the destination for the upper left of the image.
-   * @param w the width of the destination rectangle.
-   * @param h the height of the destination rectangle.
-   */
-  default void drawImage(Image img, double x, double y, double w, double h) {
-    if (img == null || img.getProgress() < 1.0) {
-      return;
+        drawImage(img, 0, 0, img.getWidth(), img.getHeight(), x, y, w, h);
     }
 
-    drawImage(img, 0, 0, img.getWidth(), img.getHeight(), x, y, w, h);
-  }
-
-  /**
-   * Draws the specified source rectangle of the given image to the given
-   * destination rectangle of the Canvas.
-   * A {@code null} image value or an image still in progress will be ignored.
-   * <p>
-   * This method will be affected by any of the
-   * <a href="#comm-attr">global common</a>
-   * or <a href="#image-attr">image</a>
-   * attributes as specified in the
-   * <a href="#attr-ops-table">Rendering Attributes Table</a>.
-   * </p>
-   *
-   * @param img the image to be drawn or null.
-   * @param sx the source rectangle's X coordinate position.
-   * @param sy the source rectangle's Y coordinate position.
-   * @param sw the source rectangle's width.
-   * @param sh the source rectangle's height.
-   * @param dx the destination rectangle's X coordinate position.
-   * @param dy the destination rectangle's Y coordinate position.
-   * @param dw the destination rectangle's width.
-   * @param dh the destination rectangle's height.
-   */
-  void drawImage(
-    Image img,
-    double sx, double sy, double sw, double sh,
-    double dx, double dy, double dw, double dh
-  );
-
+    /**
+     * Draws the specified source rectangle of the given image to the given
+     * destination rectangle of the drawing surface.
+     * A {@code null} image value or an image still in progress will be ignored.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>
+     * or <a href="#image-attr">image</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @param img the image to be drawn or null.
+     * @param sx the source rectangle's X coordinate position.
+     * @param sy the source rectangle's Y coordinate position.
+     * @param sw the source rectangle's width.
+     * @param sh the source rectangle's height.
+     * @param dx the destination rectangle's X coordinate position.
+     * @param dy the destination rectangle's Y coordinate position.
+     * @param dw the destination rectangle's width.
+     * @param dh the destination rectangle's height.
+     */
+    void drawImage(
+        Image img,
+        double sx, double sy, double sw, double sh,
+        double dx, double dy, double dw, double dh
+    );
 }

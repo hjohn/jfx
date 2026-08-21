@@ -1023,10 +1023,16 @@ public final class GraphicsContext {
      * Sets the current transform. Only 2D transforms are supported. The only
      * values used are the X and Y scaling, translation, and shearing components
      * of a transform.
+     * <p>
+     * A {@code null} value will be ignored and the current value will remain unchanged.
      *
      * @param xform The affine to be copied and used as the current transform.
      */
     public void setTransform(Affine xform) {
+        if (xform == null) {
+            return;
+        }
+
         curState.transform.setTransform(xform.getMxx(), xform.getMyx(),
                                         xform.getMxy(), xform.getMyy(),
                                         xform.getTx(), xform.getTy());
