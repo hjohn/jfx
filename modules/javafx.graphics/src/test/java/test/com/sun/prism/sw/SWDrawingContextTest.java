@@ -55,9 +55,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -267,6 +269,127 @@ public class SWDrawingContextTest {
     }
 
     @Test
+    public void shouldGetAndSetLineDashes() {
+        assertNull(h.context.getLineDashes());
+
+        h.context.setLineDashes(1, 2);
+
+        assertArrayEquals(new double[] {1, 2}, h.context.getLineDashes());
+
+        h.context.setLineDashes(5, 10, 15);  // odd length is doubled
+
+        assertArrayEquals(new double[] {5, 10, 15, 5, 10, 15}, h.context.getLineDashes());
+
+        h.context.setLineDashes(null);  // null disables dashing
+
+        assertNull(h.context.getLineDashes());
+
+        h.context.setLineDashes(2, 3);
+        h.context.setLineDashes();  // empty disables dashing
+
+        assertNull(h.context.getLineDashes());
+
+        h.context.setLineDashes(2, 3);
+        h.context.setLineDashes(0, 0);  // all zeros disables dashing
+
+        assertNull(h.context.getLineDashes());
+
+        h.context.setLineDashes(2, 3);
+        h.context.setLineDashes(-1, 2);  // negative value is ignored
+
+        assertArrayEquals(new double[] {2, 3}, h.context.getLineDashes());
+
+        h.context.setLineDashes(2, 3);
+        h.context.setLineDashes(Double.NaN, 2);  // NaN value is ignored
+
+        assertArrayEquals(new double[] {2, 3}, h.context.getLineDashes());
+
+        double[] copy = h.context.getLineDashes();
+
+        copy[0] = 99;
+
+        assertArrayEquals(new double[] {2, 3}, h.context.getLineDashes());  // getter returns a copy
+    }
+
+    @Test
+    public void shouldGetAndSetLineDashOffset() {
+        assertEquals(0.0, h.context.getLineDashOffset());
+
+        h.context.setLineDashOffset(2.5);
+
+        assertEquals(2.5, h.context.getLineDashOffset());
+
+        h.context.setLineDashOffset(Double.POSITIVE_INFINITY);  // infinite is ignored
+        h.context.setLineDashOffset(Double.NEGATIVE_INFINITY);
+        h.context.setLineDashOffset(Double.NaN);  // NaN is ignored
+
+        assertEquals(2.5, h.context.getLineDashOffset());
+    }
+
+    @Test
+    public void shouldStrokeWithDashes() {
+        h.context.setStroke(Color.RED);
+        h.context.setLineWidth(1);
+        h.context.setLineDashes(5, 2);
+        h.context.setLineCap(StrokeLineCap.BUTT);
+        h.context.strokeLine(0, 10.5, WIDTH, 10.5);
+
+        long pattern = 0;
+
+        for (int x = 0; x < WIDTH; x++) {
+            int argb = h.image.getArgb(x, 10);
+
+            pattern <<= 1;
+
+            if (argb == 0xffff0000) {
+                pattern++;
+            }
+        }
+
+        assertEquals(0b1111100111110011111001111100111110011111001111100111110011111001L, pattern);
+    }
+
+    @Test
+    public void shouldStrokeWithDashesAndSquareCaps() {
+        h.context.setStroke(Color.RED);
+        h.context.setLineWidth(1);
+        h.context.setLineDashes(4, 3);
+        h.context.setLineCap(StrokeLineCap.SQUARE);
+        h.context.strokeLine(0.5, 10.5, WIDTH, 10.5);
+
+        long pattern = 0;
+
+        for (int x = 0; x < WIDTH; x++) {
+            int argb = h.image.getArgb(x, 10);
+
+            pattern <<= 1;
+
+            if (argb == 0xffff0000) {
+                pattern++;
+            }
+        }
+
+        // square caps take up half a pixel on both ends of a dash, so pattern is the same as a 5,2 dash with butt caps
+        assertEquals(0b1111100111110011111001111100111110011111001111100111110011111001L, pattern);
+    }
+
+    @Test
+    public void shouldSaveAndRestoreLineDashes() {
+        h.context.setLineDashes(5, 5);
+        h.context.setLineDashOffset(2.0);
+
+        h.context.save();
+
+        h.context.setLineDashes(1, 2, 3);
+        h.context.setLineDashOffset(7.0);
+
+        h.context.restore();
+
+        assertArrayEquals(new double[] {5, 5}, h.context.getLineDashes());
+        assertEquals(2.0, h.context.getLineDashOffset());
+    }
+
+    @Test
     public void shouldGetAndSetImageSmoothing() {
         h.context.setImageSmoothing(false);
 
@@ -444,13 +567,13 @@ public class SWDrawingContextTest {
 
         h.context.setFill(Color.ORANGE);
         h.context.fillPolygon(
-            new double[] {30, 44,  7, 53, 16},
-            new double[] { 6, 50, 23, 23, 50},
+            new double[] {32, 46,  9, 55, 18},
+            new double[] { 8, 51, 25, 25, 51},
             5
         );
 
-        assertPixel(30, 30, Color.ORANGE);
-        assertPixel(30, 15, Color.ORANGE);
+        assertPixel(30, 30, Color.ORANGE);  // inside the central pentagon
+        assertPixel(30, 15, Color.ORANGE);  // inside a star arm
     }
 
     @Test
@@ -465,13 +588,13 @@ public class SWDrawingContextTest {
         h.context.setFillRule(FillRule.EVEN_ODD);
         h.context.setFill(Color.ORANGE);
         h.context.fillPolygon(
-            new double[] {30, 44,  7, 53, 16},
-            new double[] { 6, 50, 23, 23, 50},
+            new double[] {32, 46,  9, 55, 18},
+            new double[] { 8, 51, 25, 25, 51},
             5
         );
 
-        assertPixel(30, 30, Color.TRANSPARENT);
-        assertPixel(30, 15, Color.ORANGE);
+        assertPixel(30, 30, Color.TRANSPARENT);  // inside the central pentagon
+        assertPixel(30, 15, Color.ORANGE);  // inside a star arm
     }
 
     @Test
@@ -509,6 +632,207 @@ public class SWDrawingContextTest {
 
         // not on the polyline
         assertPixel(10, 30, Color.TRANSPARENT);
+    }
+
+    @Test
+    public void shouldFillPath() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.moveTo(10, 10);
+        h.context.lineTo(50, 10);
+        h.context.lineTo(30, 50);
+        h.context.closePath();
+        h.context.fill();
+
+        assertPixel(30, 30, Color.RED);  // inside the triangle
+        assertPixel(10, 5, Color.TRANSPARENT);  // above the top edge
+    }
+
+    @Test
+    public void shouldStrokePath() {
+        h.context.setStroke(Color.RED);
+        h.context.setLineWidth(2);
+        h.context.beginPath();
+        h.context.moveTo(10, 10);
+        h.context.lineTo(50, 10);
+        h.context.lineTo(30, 50);
+        h.context.closePath();
+        h.context.stroke();
+
+        assertPixel(30, 10, Color.RED);  // on the top edge
+        assertPixel(30, 30, Color.TRANSPARENT);  // the interior is not painted
+    }
+
+    @Test
+    public void shouldFillRectPath() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.rect(10, 10, 40, 30);
+        h.context.fill();
+
+        assertPixel(30, 25, Color.RED);  // inside the rectangle
+        assertPixel(5, 5, Color.TRANSPARENT);  // outside
+    }
+
+    @Test
+    public void shouldFillArcPath() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.arc(30, 30, 20, 20, 0, 360);
+        h.context.fill();
+
+        assertPixel(30, 15, Color.RED);  // inside the circle
+        assertPixel(30, 8, Color.TRANSPARENT);  // outside the radius
+    }
+
+    @Test
+    public void shouldFillQuadraticCurvePath() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.moveTo(10, 30);
+        h.context.quadraticCurveTo(30, 0, 50, 30);
+        h.context.closePath();
+        h.context.fill();
+
+        assertPixel(30, 20, Color.RED);  // below the curve, above the base line
+        assertPixel(30, 10, Color.TRANSPARENT);  // above the curve apex
+    }
+
+    @Test
+    public void shouldFillBezierCurvePath() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.moveTo(10, 30);
+        h.context.bezierCurveTo(20, 0, 40, 0, 50, 30);
+        h.context.closePath();
+        h.context.fill();
+
+        assertPixel(30, 20, Color.RED);  // below the curve
+        assertPixel(30, 4, Color.TRANSPARENT);  // above the curve apex
+    }
+
+    @Test
+    public void isPointInPathShouldWork() {
+        h.context.beginPath();
+        h.context.moveTo(10, 10);
+        h.context.lineTo(50, 10);
+        h.context.lineTo(30, 50);
+        h.context.closePath();
+
+        assertTrue(h.context.isPointInPath(30, 30));  // inside
+        assertFalse(h.context.isPointInPath(5, 5));  // outside
+    }
+
+    @Test
+    public void clipShouldThrow() {
+        assertThrows(UnsupportedOperationException.class, () -> h.context.clip());
+    }
+
+    @Test
+    public void arcToShouldRoundCorner() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.moveTo(10, 30);
+        h.context.arcTo(30, 30, 30, 10, 10);
+        h.context.closePath();
+        h.context.fill();
+
+        assertPixel(24, 24, Color.RED);  // inside the path
+        assertPixel(29, 29, Color.TRANSPARENT);  // cut off by the rounded corner
+    }
+
+    @Test
+    public void appendSVGPathShouldPaint() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.appendSVGPath("M 10 10 L 50 10 L 30 50 Z");
+        h.context.fill();
+
+        assertPixel(30, 30, Color.RED);  // inside the triangle
+        assertPixel(10, 5, Color.TRANSPARENT);  // outside
+    }
+
+    @Test
+    public void appendSVGPathShouldApplyCurrentTransform() {
+        h.context.setFill(Color.RED);
+        h.context.setTransform(1, 0, 0, 1, 20, 20);
+        h.context.beginPath();
+        h.context.appendSVGPath("M 10 10 L 50 10 L 30 50 Z");
+        h.context.fill();
+
+        assertPixel(50, 50, Color.RED);  // (30, 30) inside the translated triangle
+        assertPixel(20, 20, Color.TRANSPARENT);  // outside the translated triangle
+    }
+
+    @Test
+    public void shouldApplyTransformImmediatelyAtPathConstruction() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.moveTo(10, 10);
+        h.context.lineTo(50, 10);
+        h.context.lineTo(30, 50);
+        h.context.closePath();
+
+        h.context.setTransform(1, 0, 0, 1, 20, 20);  // transform changed after construction
+
+        h.context.fill();
+
+        // the coordinates were transformed when added, so the path is unaffected
+        assertPixel(30, 30, Color.RED);  // inside the triangle
+        assertPixel(40, 40, Color.TRANSPARENT);  // would be inside if the transform applied now
+    }
+
+    @Test
+    public void beginPathShouldReset() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.moveTo(0, 0);
+        h.context.lineTo(WIDTH, 0);
+        h.context.lineTo(0, HEIGHT);
+        h.context.closePath();
+
+        h.context.beginPath();  // reset the first path
+        h.context.moveTo(10, 10);
+        h.context.lineTo(50, 10);
+        h.context.lineTo(30, 50);
+        h.context.closePath();
+        h.context.fill();
+
+        assertPixel(30, 30, Color.RED);  // the second path is painted
+        assertPixel(5, 50, Color.TRANSPARENT);  // the reset path is not
+    }
+
+    @Test
+    public void shouldFillPathWithEvenOddFillRule() {
+        h.context.setFill(Color.RED);
+        h.context.setFillRule(FillRule.EVEN_ODD);
+        h.context.beginPath();
+        h.context.moveTo(10, 10);
+        h.context.lineTo(40, 40);
+        h.context.lineTo(10, 40);
+        h.context.closePath();
+        h.context.moveTo(25, 10);
+        h.context.lineTo(54, 40);
+        h.context.lineTo(25, 40);
+        h.context.closePath();
+        h.context.fill();
+
+        assertPixel(12, 15, Color.RED);  // covered by one triangle (winding 1)
+        assertPixel(30, 35, Color.TRANSPARENT);  // covered by both triangles (winding 2)
+    }
+
+    @Test
+    public void shouldNotAffectPathOnSaveRestore() {
+        h.context.beginPath();
+        h.context.moveTo(10, 10);
+        h.context.lineTo(50, 10);
+        h.context.lineTo(30, 50);
+        h.context.closePath();
+
+        h.context.save();
+        h.context.restore();
+
+        assertTrue(h.context.isPointInPath(30, 30));  // the path is not saved or restored
     }
 
     @Test

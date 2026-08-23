@@ -156,7 +156,7 @@ public class RandomShapesDemo extends Application {
         gc.setStroke(stroke);
         gc.setLineWidth(lineWidth);
 
-        switch (rnd.nextInt(5)) {
+        switch (rnd.nextInt(6)) {
             case 0 -> {
                 dc.fillRect(x, y, w, h);
                 gc.fillRect(x, y, w, h);
@@ -184,6 +184,18 @@ public class RandomShapesDemo extends Application {
                 gc.setFont(font);
                 dc.fillText(text, x, y);
                 gc.fillText(text, x, y);
+            }
+            case 5 -> {
+                double dash1 = 2 + rnd.nextDouble() * 15;
+                double dash2 = 2 + rnd.nextDouble() * 15;
+                double offset = rnd.nextDouble() * (dash1 + dash2);
+
+                dc.setLineDashes(dash1, dash2);
+                gc.setLineDashes(dash1, dash2);
+                dc.setLineDashOffset(offset);
+                gc.setLineDashOffset(offset);
+                dc.strokeRect(x, y, w, h);
+                gc.strokeRect(x, y, w, h);
             }
         }
 

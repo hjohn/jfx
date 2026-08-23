@@ -32,12 +32,14 @@ import com.sun.javafx.font.FontStrike;
 import com.sun.javafx.font.PGFont;
 import com.sun.javafx.geom.Arc2D;
 import com.sun.javafx.geom.BaseBounds;
+import com.sun.javafx.geom.IllegalPathStateException;
 import com.sun.javafx.geom.Path2D;
 import com.sun.javafx.geom.Point2D;
 import com.sun.javafx.geom.RectBounds;
 import com.sun.javafx.geom.Rectangle;
 import com.sun.javafx.geom.transform.Affine2D;
 import com.sun.javafx.geom.transform.BaseTransform;
+import com.sun.javafx.geom.transform.NoninvertibleTransformException;
 import com.sun.javafx.scene.text.FontHelper;
 import com.sun.javafx.scene.text.GlyphList;
 import com.sun.javafx.scene.text.TextLayout;
@@ -53,6 +55,7 @@ import com.sun.prism.Texture.Usage;
 
 import java.nio.IntBuffer;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -86,7 +89,7 @@ import javafx.scene.transform.Affine;
  * <p>
  * Features include:
  * <ul>
- *   <li>Stroke and fill management (line width, line caps, joins, miter limits).</li>
+ *   <li>Stroke and fill management (line width, line caps, joins, miter limits, dashes).</li>
  *   <li>Global alpha and support for {@link javafx.scene.effect.BlendMode#SRC_OVER} and
  *       {@link javafx.scene.effect.BlendMode#ADD}.</li>
  *    <li>Drawing of lines, rectangles, rounded rectangles, ovals, arcs, polygons, polylines, and images.</li>
@@ -95,7 +98,6 @@ import javafx.scene.transform.Affine;
  * <p>
  * Limitations:
  * <ul>
- *   <li>Dashed strokes are not yet implemented.</li> TODO
  *   <li>Only SRC_OVER blend mode is supported; others will throw an exception.</li>
  * </ul>
   * <p>
@@ -137,6 +139,8 @@ public class SWDrawingContext implements DrawingContext {
     private StrokeLineCap lineCap = StrokeLineCap.SQUARE;
     private StrokeLineJoin lineJoin = StrokeLineJoin.MITER;
     private double miterLimit = 10.0;
+    private double[] lineDashes;
+    private double lineDashOffset;
 
     // Path attributes
     private FillRule fillRule = FillRule.NON_ZERO;
@@ -149,6 +153,10 @@ public class SWDrawingContext implements DrawingContext {
     private TextAlignment textAlign = TextAlignment.LEFT;
     private VPos textBaseline = VPos.BASELINE;
     private FontSmoothingType fontSmoothingType = FontSmoothingType.GRAY;
+
+    // Path attributes
+    private final Path2D path = new Path2D();
+    private final float[] coords = new float[6];
 
     // Cached prism values
     private com.sun.prism.paint.Paint prismFillPaint = com.sun.prism.paint.Color.BLACK;
@@ -164,6 +172,8 @@ public class SWDrawingContext implements DrawingContext {
         StrokeLineCap lineCap,
         StrokeLineJoin lineJoin,
         double miterLimit,
+        double[] lineDashes,
+        double lineDashOffset,
         FillRule fillRule,
         boolean imageSmoothing,
         Font font,
@@ -335,6 +345,70 @@ public class SWDrawingContext implements DrawingContext {
 
             invalidateStroke();
         }
+    }
+
+    @Override
+    public void setLineDashes(double... dashes) {
+        double[] newDashes = null;
+
+        if (dashes != null && dashes.length > 0) {
+            boolean allZeros = true;
+
+            for (double d : dashes) {
+                if (d >= 0.0 && d < Double.POSITIVE_INFINITY) {
+                    // Non-NaN, finite, non-negative
+                    // Test cannot be inverted or it will not implicitly test for NaN
+                    if (d > 0) {
+                        allZeros = false;
+                    }
+                }
+                else {
+                    return;  // invalid dash found, ignore entire call
+                }
+            }
+
+            if (!allZeros) {
+                int dashlen = dashes.length;
+
+                if ((dashlen & 1) == 0) {
+                    newDashes = Arrays.copyOf(dashes, dashlen);
+                }
+                else {
+                    newDashes = Arrays.copyOf(dashes, dashlen * 2);
+
+                    System.arraycopy(dashes, 0, newDashes, dashlen, dashlen);
+                }
+            }
+        }
+
+        if (!Arrays.equals(this.lineDashes, newDashes)) {
+            this.lineDashes = newDashes;
+
+            invalidateStroke();
+        }
+    }
+
+    @Override
+    public double[] getLineDashes() {
+        return lineDashes == null ? null : Arrays.copyOf(lineDashes, lineDashes.length);
+    }
+
+    @Override
+    public void setLineDashOffset(double dashOffset) {
+        // Per W3C spec: On setting, infinite, and NaN
+        // values must be ignored, leaving the value unchanged
+        if (dashOffset > Double.NEGATIVE_INFINITY && dashOffset < Double.POSITIVE_INFINITY) {
+            if (dashOffset != this.lineDashOffset) {
+                this.lineDashOffset = dashOffset;
+
+                invalidateStroke();
+            }
+        }
+    }
+
+    @Override
+    public double getLineDashOffset() {
+        return lineDashOffset;
     }
 
     @Override
@@ -519,7 +593,9 @@ public class SWDrawingContext implements DrawingContext {
     public void save() {
         stateStack.push(new State(
             globalAlpha, globalBlendMode, fill, stroke, lineWidth, lineCap, lineJoin,
-            miterLimit, fillRule, imageSmoothing,
+            miterLimit,
+            lineDashes != null ? lineDashes.clone() : null, lineDashOffset,
+            fillRule, imageSmoothing,
             font, textAlign, textBaseline, fontSmoothingType,
             transform.getMxx(), transform.getMyx(), transform.getMxy(), transform.getMyy(),
             transform.getMxt(), transform.getMyt(),
@@ -546,6 +622,8 @@ public class SWDrawingContext implements DrawingContext {
         setLineCap(s.lineCap());
         setLineJoin(s.lineJoin());
         setMiterLimit(s.miterLimit());
+        setLineDashes(s.lineDashes());
+        setLineDashOffset(s.lineDashOffset());
         setFont(s.font());
         setTextAlign(s.textAlign());
         setTextBaseline(s.textBaseline());
@@ -741,6 +819,191 @@ public class SWDrawingContext implements DrawingContext {
 
             markRectDirty(minX, minY, maxX - minX, maxY - minY);
         }
+    }
+
+    @Override
+    public void beginPath() {
+        path.reset();
+    }
+
+    @Override
+    public void moveTo(double x0, double y0) {
+        coords[0] = (float) x0;
+        coords[1] = (float) y0;
+
+        transform.transform(coords, 0, coords, 0, 1);
+
+        path.moveTo(coords[0], coords[1]);
+    }
+
+    @Override
+    public void lineTo(double x1, double y1) {
+        coords[0] = (float) x1;
+        coords[1] = (float) y1;
+
+        transform.transform(coords, 0, coords, 0, 1);
+
+        if (path.getNumCommands() == 0) {
+            path.moveTo(coords[0], coords[1]);
+        }
+
+        path.lineTo(coords[0], coords[1]);
+    }
+
+    @Override
+    public void quadraticCurveTo(double xc, double yc, double x1, double y1) {
+        coords[0] = (float) xc;
+        coords[1] = (float) yc;
+        coords[2] = (float) x1;
+        coords[3] = (float) y1;
+
+        transform.transform(coords, 0, coords, 0, 2);
+
+        if (path.getNumCommands() == 0) {
+            path.moveTo(coords[0], coords[1]);
+        }
+
+        path.quadTo(coords[0], coords[1], coords[2], coords[3]);
+    }
+
+    @Override
+    public void bezierCurveTo(double xc1, double yc1, double xc2, double yc2, double x1, double y1) {
+        coords[0] = (float) xc1;
+        coords[1] = (float) yc1;
+        coords[2] = (float) xc2;
+        coords[3] = (float) yc2;
+        coords[4] = (float) x1;
+        coords[5] = (float) y1;
+
+        transform.transform(coords, 0, coords, 0, 3);
+
+        if (path.getNumCommands() == 0) {
+            path.moveTo(coords[0], coords[1]);
+        }
+
+        path.curveTo(coords[0], coords[1], coords[2], coords[3], coords[4], coords[5]);
+    }
+
+    @Override
+    public void arcTo(double x1, double y1, double x2, double y2, double radius) {
+        if (path.getNumCommands() == 0) {
+            moveTo(x1, y1);
+        }
+        else {
+            try {
+                path.arcTo(transform, (float) x1, (float) y1, (float) x2, (float) y2, (float) radius);
+            }
+            catch (IllegalPathStateException | NoninvertibleTransformException e) {
+                lineTo(x1, y1);
+            }
+        }
+    }
+
+    @Override
+    public void arc(double centerX, double centerY, double radiusX, double radiusY, double startAngle, double length) {
+        Arc2D arc = new Arc2D(
+            (float) (centerX - radiusX), // x
+            (float) (centerY - radiusY), // y
+            (float) (radiusX * 2.0), // w
+            (float) (radiusY * 2.0), // h
+            (float) startAngle,
+            (float) length,
+            Arc2D.OPEN
+        );
+
+        path.append(arc.getPathIterator(transform), true);
+    }
+
+    @Override
+    public void rect(double x, double y, double w, double h) {
+        coords[0] = (float) x;
+        coords[1] = (float) y;
+        coords[2] = (float) w;
+        coords[3] = 0;
+        coords[4] = 0;
+        coords[5] = (float) h;
+
+        transform.deltaTransform(coords, 0, coords, 0, 3);
+
+        float x0 = coords[0] + (float) transform.getMxt();
+        float y0 = coords[1] + (float) transform.getMyt();
+        float dx1 = coords[2];
+        float dy1 = coords[3];
+        float dx2 = coords[4];
+        float dy2 = coords[5];
+
+        path.moveTo(x0, y0);
+        path.lineTo(x0 + dx1, y0 + dy1);
+        path.lineTo(x0 + dx1 + dx2, y0 + dy1 + dy2);
+        path.lineTo(x0 + dx2, y0 + dy2);
+        path.closePath();
+    }
+
+    @Override
+    public void appendSVGPath(String svgpath) {
+        if (svgpath == null) return;
+
+        try {
+            path.appendSVGPath(transform, svgpath);
+        }
+        catch (IllegalArgumentException | IllegalPathStateException | NoninvertibleTransformException ex) {
+            //Ignore incorrect path
+        }
+    }
+
+    @Override
+    public void closePath() {
+        if (path.getNumCommands() > 0) {
+            path.closePath();
+        }
+    }
+
+    @Override
+    public void fill() {
+        if (path.getNumCommands() == 0) {
+            return;
+        }
+
+        path.setWindingRule(fillRule == FillRule.EVEN_ODD ? Path2D.WIND_EVEN_ODD : Path2D.WIND_NON_ZERO);
+
+        graphics.setTransform(BaseTransform.IDENTITY_TRANSFORM);
+        graphics.setPaint(prismFillPaint);
+        graphics.fill(path);
+        graphics.setTransform(transform);
+
+        RectBounds bounds = path.getBounds();
+
+        markDeviceRectDirty(bounds.getMinX(), bounds.getMinY(), bounds.getMaxX(), bounds.getMaxY());
+    }
+
+    @Override
+    public void stroke() {
+        if (path.getNumCommands() == 0) {
+            return;
+        }
+
+        applyStrokeParameters();
+
+        graphics.setTransform(BaseTransform.IDENTITY_TRANSFORM);
+        graphics.draw(path);
+        graphics.setTransform(transform);
+
+        RectBounds bounds = path.getBounds();
+        double r = strokeExpansion();
+
+        markDeviceRectDirty(bounds.getMinX() - r, bounds.getMinY() - r, bounds.getMaxX() + r, bounds.getMaxY() + r);
+    }
+
+    @Override
+    public void clip() {
+        throw new UnsupportedOperationException("path based clipping is not supported");
+    }
+
+    @Override
+    public boolean isPointInPath(double x, double y) {
+        // TODO: HTML5 considers points on the path to be inside, but we
+        // implement a halfin-halfout approach...
+        return path.contains((float) x, (float) y);
     }
 
     @Override
@@ -955,7 +1218,9 @@ public class SWDrawingContext implements DrawingContext {
                     case ROUND -> BasicStroke.JOIN_ROUND;
                     case MITER -> BasicStroke.JOIN_MITER;
                 },
-                (float)miterLimit
+                (float)miterLimit,
+                lineDashes,
+                (float)lineDashOffset
             );
         }
 
@@ -984,6 +1249,36 @@ public class SWDrawingContext implements DrawingContext {
         double dirtyH = h + r * 2.0;
 
         markRectDirty(dirtyX, dirtyY, dirtyW, dirtyH);
+    }
+
+    /*
+     * How far a stroke of the current width can extend beyond the path bounds,
+     * based on the line join and cap.
+     */
+    private double strokeExpansion() {
+        double halfWidth = lineWidth * 0.5;
+
+        return halfWidth * switch (lineJoin) {
+            case MITER -> Math.max(miterLimit, lineCap == StrokeLineCap.SQUARE ? SQRT2 : 1.0);
+            case BEVEL, ROUND -> lineCap == StrokeLineCap.SQUARE ? SQRT2 : 1.0;
+        };
+    }
+
+    /*
+     * Reports a dirty rectangle given in device coordinates (already
+     * transformed), clipped to the image bounds.
+     */
+    private void markDeviceRectDirty(double x1, double y1, double x2, double y2) {
+        double minX = Math.max(0, Math.floor(Math.min(x1, x2)));
+        double minY = Math.max(0, Math.floor(Math.min(y1, y2)));
+        double maxX = Math.min(imageWidth, Math.ceil(Math.max(x1, x2)));
+        double maxY = Math.min(imageHeight, Math.ceil(Math.max(y1, y2)));
+
+        if (maxX <= minX || maxY <= minY) {
+            return;
+        }
+
+        pixelsDirty.accept(new Rectangle((int) minX, (int) minY, (int) (maxX - minX), (int) (maxY - minY)));
     }
 
     // TODO It seems bufferDirty only remembers the last rect; may need to update this only once per frame

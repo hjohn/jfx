@@ -145,6 +145,22 @@ import javafx.scene.transform.Affine;
  * boundary path of a shape, relative to the line width, before it is truncated
  * to a {@link StrokeLineJoin#BEVEL BEVEL} join in a stroke operation.
  * </td></tr>
+ * <tr class="altColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #setLineDashes(double...) Line Dashes}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">{@code null}</td>
+ * <td class="colLast">
+ * The array of dash lengths to be applied to the segments in the boundary
+ * of shapes in a stroke operation.
+ * </td></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #setLineDashOffset(double) Dash Offset}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:10%; text-align:center">{@code 0.0}</td>
+ * <td class="colLast">
+ * The distance offset into the array of dash lengths at which to start the
+ * dashing of the segments in the boundary of shapes in a stroke operation.
+ * </td></tr>
  * <tr><th colspan="3" scope="row"><a id="text-attr">Text Attributes</a></th></tr>
  * <tr class="rowColor">
  * <th scope="row" class="colLast" style="width:15%">{@link #setFont(javafx.scene.text.Font) Font}</th>
@@ -178,6 +194,14 @@ import javafx.scene.transform.Affine;
  * for all fill text operations.
  * </td></tr>
  * <tr><th colspan="3" scope="row"><a id="path-attr">Path Attributes</a></th></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:15%">{@link #beginPath() Current Path}</th>
+ * <td class="colLast" style="width:10%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:10%; text-align:center">Empty path</td>
+ * <td class="colLast">
+ * The path constructed using various path construction methods to be used
+ * in various path filling, stroking, or clipping operations.
+ * </td></tr>
  * <tr class="altColor">
  * <th scope="row" class="colLast" style="width:15%">{@link #setFillRule(javafx.scene.shape.FillRule) Fill Rule}</th>
  * <td class="colLast" style="width:10%; text-align:center; color:#0c0">Yes</td>
@@ -280,6 +304,76 @@ import javafx.scene.transform.Affine;
  * <tr><th scope="row" colspan="7">
  * <a id="base-fn-1">[1]</a> Only the Transform and Clip apply to clearRect()<br>
  * <a id="base-fn-2">[2]</a> Only the Fill Rule applies to fillPolygon()
+ * </th></tr>
+ * <tr><th scope="row" colspan="1">Path Construction</th></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:22%">
+ * {@link #beginPath() beginPath()},
+ * {@link #moveTo(double, double) moveTo()},
+ * {@link #lineTo(double, double) lineTo()},
+ * {@link #quadraticCurveTo(double, double, double, double) quadraticCurveTo()},
+ * {@link #bezierCurveTo(double, double, double, double, double, double) bezierCurveTo()},
+ * {@link #arcTo(double, double, double, double, double) arcTo()},
+ * {@link #arc(double, double, double, double, double, double) arc()},
+ * {@link #rect(double, double, double, double) rect()},
+ * {@link #appendSVGPath(java.lang.String) appendSVGPath()},
+ * {@link #closePath() closePath()}
+ * </th>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#path-fn-4">[4]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * </tr>
+ * <tr><th scope="row" colspan="1">Path Rendering</th></tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:22%">
+ * {@link #fill() fill()}
+ * </th>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#path-fn-5">[5]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * </tr>
+ * <tr class="altColor">
+ * <th scope="row" class="colLast" style="width:22%">
+ * {@link #stroke() stroke()}
+ * </th>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * </tr>
+ * <tr class="rowColor">
+ * <th scope="row" class="colLast" style="width:22%">
+ * {@link #clip() clip()}
+ * </th>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#path-fn-5">[5]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * </tr>
+ * <tr class="altColor">
+ * <th scope="row" class="colLast" style="width:22%">
+ * {@link #isPointInPath(double, double) isPointInPath()}
+ * </th>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#0c0">Yes <a href="#path-fn-5">[5]</a></td>
+ * <td class="colLast" style="width:13%; text-align:center; color:#c00">No</td>
+ * </tr>
+ * <tr><th scope="row" colspan="7">
+ * <a id="path-fn-4">[4]</a> Transform applied only during path construction<br>
+ * <a id="path-fn-5">[5]</a> Fill Rule only used for fill() and clip()
  * </th></tr>
  * <tr><th scope="row" colspan="1">Text Rendering</th></tr>
  * <tr class="rowColor">
@@ -563,6 +657,63 @@ public interface DrawingContext {
     void setMiterLimit(double ml);
 
     /**
+     * Sets the current stroke line dash pattern to a normalized copy of
+     * the argument.
+     * The default value is {@code null}.
+     * The line dash array is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * If the array is {@code null} or empty or contains all {@code 0} elements
+     * then dashing will be disabled and the current dash array will be set
+     * to {@code null}.
+     * If any of the elements of the array are a negative, infinite, or NaN
+     * value outside the range {@code [0, +inf)} then the entire array will
+     * be ignored and the current dash array will remain unchanged.
+     * If the array is an odd length then it will be treated as if it
+     * were two copies of the array appended to each other.
+     *
+     * @param dashes the array of finite non-negative dash lengths
+     */
+    void setLineDashes(double... dashes);
+
+    /**
+     * Gets a copy of the current line dash array.
+     * The default value is {@code null}.
+     * The array may be normalized by the validation tests in the
+     * {@link #setLineDashes(double...)} method.
+     * The line dash array is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return a copy of the current line dash array.
+     */
+    double[] getLineDashes();
+
+    /**
+     * Sets the line dash offset.
+     * The default value is {@code 0.0}.
+     * The line dash offset is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * An infinite or NaN value outside of the range {@code (-inf, +inf)}
+     * will be ignored and the current value will remain unchanged.
+     *
+     * @param dashOffset the line dash offset in the range {@code (-inf, +inf)}
+     */
+    void setLineDashOffset(double dashOffset);
+
+    /**
+     * Gets the current line dash offset.
+     * The default value is {@code 0.0}.
+     * The line dash offset is a <a href="#strk-attr">stroke attribute</a>
+     * used for any of the stroke methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     *
+     * @return the line dash offset in the range {@code (-inf, +inf)}
+     */
+    double getLineDashOffset();
+
+    /**
      * Gets the current image smoothing state.
      *
      * @defaultValue {@code true}
@@ -765,6 +916,8 @@ public interface DrawingContext {
      *     <li>Line Cap</li>
      *     <li>Line Join</li>
      *     <li>Miter Limit</li>
+     *     <li>Line Dashes</li>
+     *     <li>Dash Offset</li>
      *     <li>Clip</li>
      *     <li>Font</li>
      *     <li>Text Align</li>
@@ -791,6 +944,8 @@ public interface DrawingContext {
      *     <li>Line Cap</li>
      *     <li>Line Join</li>
      *     <li>Miter Limit</li>
+     *     <li>Line Dashes</li>
+     *     <li>Dash Offset</li>
      *     <li>Clip</li>
      *     <li>Font</li>
      *     <li>Text Align</li>
@@ -1019,6 +1174,281 @@ public interface DrawingContext {
      * @param nPoints the number of points that make the polygon.
      */
     void fillPolygon(double xPoints[], double yPoints[], int nPoints);
+
+    /**
+     * Resets the path.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     */
+    void beginPath();
+
+    /**
+     * Issues a move command for the current path to the given x,y coordinate.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     *
+     * @param x0 the X position for the move to command.
+     * @param y0 the Y position for the move to command.
+     */
+    void moveTo(double x0, double y0);
+
+    /**
+     * Adds segments to the current path to make a line to the given x,y
+     * coordinate.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     *
+     * @param x1 the X coordinate of the ending point of the line.
+     * @param y1 the Y coordinate of the ending point of the line.
+     */
+    void lineTo(double x1, double y1);
+
+    /**
+     * Adds segments to the current path to make a quadratic Bezier curve.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     *
+     * @param xc the X coordinate of the control point
+     * @param yc the Y coordinate of the control point
+     * @param x1 the X coordinate of the end point
+     * @param y1 the Y coordinate of the end point
+     */
+    void quadraticCurveTo(double xc, double yc, double x1, double y1);
+
+    /**
+     * Adds segments to the current path to make a cubic Bezier curve.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     *
+     * @param xc1 the X coordinate of first Bezier control point.
+     * @param yc1 the Y coordinate of the first Bezier control point.
+     * @param xc2 the X coordinate of the second Bezier control point.
+     * @param yc2 the Y coordinate of the second Bezier control point.
+     * @param x1  the X coordinate of the end point.
+     * @param y1  the Y coordinate of the end point.
+     */
+    void bezierCurveTo(double xc1, double yc1, double xc2, double yc2, double x1, double y1);
+
+    /**
+     * Adds path elements to the current path to make an arc.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     * <p>
+     * If {@code p0} is the current point in the path and {@code p1} is the
+     * point specified by {@code (x1, y1)} and {@code p2} is the point
+     * specified by {@code (x2, y2)}, then the arc segments appended will
+     * be segments along the circumference of a circle of the specified
+     * radius touching and inscribed into the convex (interior) side of
+     * {@code p0->p1->p2}.  The path will contain a line segment (if
+     * needed) to the tangent point between that circle and {@code p0->p1}
+     * followed by circular arc segments to reach the tangent point between
+     * the circle and {@code p1->p2} and will end with the current point at
+     * that tangent point (not at {@code p2}).
+     * Note that the radius and circularity of the arc segments will be
+     * measured or considered relative to the current transform, but the
+     * resulting segments that are computed from those untransformed
+     * points will then be transformed when they are added to the path.
+     * Since all computation is done in untransformed space, but the
+     * pre-existing path segments are all transformed, the ability to
+     * correctly perform the computation may implicitly depend on being
+     * able to inverse transform the current end of the current path back
+     * into untransformed coordinates.
+     * </p>
+     * <p>
+     * If there is no way to compute and inscribe the indicated circle
+     * for any reason then the entire operation will simply append segments
+     * to force a line to point {@code p1}.  Possible reasons that the
+     * computation may fail include:
+     * <ul>
+     * <li>The current path is empty.</li>
+     * <li>The segments {@code p0->p1->p2} are colinear.</li>
+     * <li>the current transform is non-invertible so that the current end
+     * point of the current path cannot be untransformed for computation.</li>
+     * </ul>
+     * <p>
+     * Implementations that do not support this operation will throw
+     * {@link UnsupportedOperationException}.
+     * </p>
+     *
+     * @param x1 the X coordinate of the first point of the arc.
+     * @param y1 the Y coordinate of the first point of the arc.
+     * @param x2 the X coordinate of the second point of the arc.
+     * @param y2 the Y coordinate of the second point of the arc.
+     * @param radius the radius of the arc in the range {0.0-positive infinity}.
+     * @throws UnsupportedOperationException if the implementation does not
+     *         support this operation
+     */
+    void arcTo(double x1, double y1, double x2, double y2, double radius);
+
+    /**
+     * Adds path elements to the current path to make an arc that uses Euclidean
+     * degrees. This Euclidean orientation sweeps from East to North, then West,
+     * then South, then back to East.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     *
+     * @param centerX the center x position of the arc.
+     * @param centerY the center y position of the arc.
+     * @param radiusX the x radius of the arc.
+     * @param radiusY the y radius of the arc.
+     * @param startAngle the starting angle of the arc in the range {@code 0-360.0}
+     * @param length  the length of the baseline of the arc.
+     */
+    void arc(double centerX, double centerY,
+             double radiusX, double radiusY,
+             double startAngle, double length);
+
+    /**
+     * Adds path elements to the current path to make a rectangle.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     *
+     * @param x x position of the upper left corner of the rectangle.
+     * @param y y position of the upper left corner of the rectangle.
+     * @param w width of the rectangle.
+     * @param h height of the rectangle.
+     */
+    void rect(double x, double y, double w, double h);
+
+    /**
+     * Appends an SVG Path string to the current path. If there is no current
+     * path the string must then start with either type of move command.
+     * A {@code null} value or incorrect SVG path will be ignored.
+     * The coordinates are transformed by the current transform as they are
+     * added to the path and unaffected by subsequent changes to the transform.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     * <p>
+     * Implementations that do not support this operation will throw
+     * {@link UnsupportedOperationException}.
+     * </p>
+     *
+     * @param svgpath the SVG Path string.
+     * @throws UnsupportedOperationException if the implementation does not
+     *         support this operation
+     */
+    void appendSVGPath(String svgpath);
+
+    /**
+     * Closes the path.
+     * The current path is a <a href="#path-attr">path attribute</a>
+     * used for any of the path methods as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>
+     * and <b>is not affected</b> by the {@link #save()} and
+     * {@link #restore()} operations.
+     */
+    void closePath();
+
+    /**
+     * Fills the path with the current fill paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>,
+     * <a href="#fill-attr">fill</a>,
+     * or <a href="#path-attr">path</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * Note that the path segments were transformed as they were originally
+     * added to the current path so the current transform will not affect
+     * those path segments again, but it may affect other attributes in
+     * affect at the time of the {@code fill()} operation.
+     * </p>
+     */
+    void fill();
+
+    /**
+     * Strokes the path with the current stroke paint.
+     * <p>
+     * This method will be affected by any of the
+     * <a href="#comm-attr">global common</a>,
+     * <a href="#strk-attr">stroke</a>,
+     * or <a href="#path-attr">path</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * Note that the path segments were transformed as they were originally
+     * added to the current path so the current transform will not affect
+     * those path segments again, but it may affect other attributes in
+     * affect at the time of the {@code stroke()} operation.
+     * </p>
+     */
+    void stroke();
+
+    /**
+     * Intersects the current clip with the current path and applies it to
+     * subsequent rendering operations as an anti-aliased mask.
+     * The current clip is a <a href="#comm-attr">common attribute</a>
+     * used for nearly all rendering operations as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * <p>
+     * This method will itself be affected only by the
+     * <a href="#path-attr">path</a>
+     * attributes as specified in the
+     * <a href="#attr-ops-table">Rendering Attributes Table</a>.
+     * Note that the path segments were transformed as they were originally
+     * added to the current path so the current transform will not affect
+     * those path segments again, but it may affect other attributes in
+     * affect at the time of the {@code clip()} operation.
+     * </p>
+     * <p>
+     * Implementations that do not support path based clipping will throw
+     * {@link UnsupportedOperationException}.
+     * </p>
+     *
+     * @throws UnsupportedOperationException if the implementation does not
+     *         support path based clipping
+     */
+    void clip();
+
+    /**
+     * Returns true if the the given x,y point is inside the path.
+     *
+     * @param x the X coordinate to use for the check.
+     * @param y the Y coordinate to use for the check.
+     * @return true if the point given is inside the path, false
+     * otherwise.
+     */
+    boolean isPointInPath(double x, double y);
 
     /**
      * Gets the current font.
