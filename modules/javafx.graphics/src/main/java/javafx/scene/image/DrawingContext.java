@@ -52,7 +52,6 @@ import javafx.scene.transform.Affine;
  * <p>
  * The {@code DrawingContext} maintains the following rendering attributes
  * which affect various subsets of the rendering methods:
- * <p>
  * <table class="overviewSummary" style="width:80%; margin-left:auto; margin-right:auto">
  * <caption>List of Rendering Attributes</caption>
  * <tr>
@@ -225,7 +224,6 @@ import javafx.scene.transform.Affine;
  * The various rendering methods on the {@code DrawingContext} use the
  * following sets of rendering attributes:
  * </a>
- * <p>
  * <table class="overviewSummary" style="width:80%; margin-left:auto; margin-right:auto">
  * <caption>Rendering Attributes Table</caption>
  * <tr>
