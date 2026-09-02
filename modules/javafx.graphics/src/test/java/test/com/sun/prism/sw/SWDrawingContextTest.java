@@ -59,6 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -1045,6 +1046,65 @@ public class SWDrawingContextTest {
     }
 
     @Test
+    public void everyFillShouldReportDirtyRegionCoveringThePixels() {
+        h.context.setFill(Color.RED);
+
+        assertDirtyCoversOnEmptyImage("fillRect", () -> h.context.fillRect(10, 10, 40, 20));
+        assertDirtyCoversOnEmptyImage("fillRoundRect", () -> h.context.fillRoundRect(10, 10, 40, 20, 8, 8));
+        assertDirtyCoversOnEmptyImage("fillOval", () -> h.context.fillOval(10, 10, 40, 20));
+        assertDirtyCoversOnEmptyImage("fillArc", () -> h.context.fillArc(10, 10, 40, 20, 0, 90, ArcType.OPEN));
+        assertDirtyCoversOnEmptyImage("fillPolygon", () -> h.context.fillPolygon(new double[] {10, 50, 30}, new double[] {10, 10, 50}, 3));
+        assertDirtyCoversOnEmptyImage("fillText", () -> h.context.fillText("M", 10, 20));
+        assertDirtyCoversOnEmptyImage("path fill", () -> {
+            h.context.beginPath();
+            h.context.moveTo(10, 10);
+            h.context.lineTo(50, 10);
+            h.context.lineTo(30, 50);
+            h.context.closePath();
+            h.context.fill();
+        });
+    }
+
+    @Test
+    public void everyStrokeShouldReportDirtyRegionCoveringTheStroke() {
+        h.context.setStroke(Color.RED);
+        h.context.setLineWidth(6);  // the stroke extends beyond the shape geometry
+
+        assertDirtyCoversOnEmptyImage("strokeLine", () -> h.context.strokeLine(10, 10, 50, 10));
+        assertDirtyCoversOnEmptyImage("strokeRect", () -> h.context.strokeRect(10, 10, 40, 20));
+        assertDirtyCoversOnEmptyImage("strokeRoundRect", () -> h.context.strokeRoundRect(10, 10, 40, 20, 8, 8));
+        assertDirtyCoversOnEmptyImage("strokeOval", () -> h.context.strokeOval(10, 10, 40, 20));
+        assertDirtyCoversOnEmptyImage("strokeArc", () -> h.context.strokeArc(10, 10, 40, 20, 0, 90, ArcType.OPEN));
+        assertDirtyCoversOnEmptyImage("strokePolygon", () -> h.context.strokePolygon(new double[] {10, 50, 30}, new double[] {10, 10, 50}, 3));
+        assertDirtyCoversOnEmptyImage("strokePolyline", () -> h.context.strokePolyline(new double[] {10, 10, 50}, new double[] {10, 50, 50}, 3));
+        assertDirtyCoversOnEmptyImage("strokeText", () -> h.context.strokeText("M", 10, 20));
+        assertDirtyCoversOnEmptyImage("path stroke", () -> {
+            h.context.beginPath();
+            h.context.moveTo(10, 10);
+            h.context.lineTo(50, 10);
+            h.context.lineTo(30, 50);
+            h.context.closePath();
+            h.context.stroke();
+        });
+    }
+
+    @Test
+    public void imageShouldReportDirtyRegionCoveringTheChangedPixels() {
+        Image source = createSolidFxImage(8, 8, argb(255, 0, 255, 0));
+
+        assertDirtyCoversOnEmptyImage("drawImage", () -> h.context.drawImage(source, 0, 0, 8, 8, 10, 10, 40, 20));
+    }
+
+    @Test
+    public void clearShouldReportDirtyRegionCoveringTheChangedPixels() {
+        assertDirtyCoversChanged(Color.RED, "clearRect", () -> h.context.clearRect(10, 10, 40, 20));
+    }
+
+    private void assertDirtyCoversOnEmptyImage(String name, Runnable operation) {
+        assertDirtyCoversChanged(Color.TRANSPARENT, name, operation);
+    }
+
+    @Test
     public void shouldClipRect() {
         h.context.setFill(Color.RED);
         h.context.fillRect(0, 0, WIDTH, HEIGHT);
@@ -1441,5 +1501,60 @@ public class SWDrawingContextTest {
             (int) Math.ceil(maxX) - (int) Math.floor(minX),
             (int) Math.ceil(maxY) - (int) Math.floor(minY)
         );
+    }
+
+    /*
+     * Runs a drawing operation and assert that a single dirty rectangle was
+     * reported and that it covers every pixel the operation changed.
+     */
+    private void assertDirtyCoversChanged(Color background, String name, Runnable operation) {
+        h.context.save();
+        h.context.clearRect(0, 0, WIDTH, HEIGHT);
+        h.context.setFill(background);
+        h.context.fillRect(0, 0, WIDTH, HEIGHT);
+        h.context.restore();
+
+        int[] before = snapshotPixels();
+
+        h.dirtyRects.clear();
+
+        operation.run();
+
+        int[] after = snapshotPixels();
+        Rectangle changed = boundsOfChangedPixels(before, after);
+
+        assertNotNull(changed, name + " should have changed some pixels");
+        assertTrue(h.dirtyRects.size() == 1, name + " should have reported a single dirty region");
+
+        Rectangle dirty = h.dirtyRects.get(0);
+
+        assertTrue(
+            dirty.contains(changed.x, changed.y, changed.width, changed.height),
+            name + ": dirty region " + dirty + " must cover the changed pixels " + changed
+        );
+    }
+
+    private int[] snapshotPixels() {
+        return ((IntBuffer) h.image.getPixelBuffer()).array().clone();
+    }
+
+    private static Rectangle boundsOfChangedPixels(int[] before, int[] after) {
+        int minX = WIDTH;
+        int minY = HEIGHT;
+        int maxX = -1;
+        int maxY = -1;
+
+        for (int y = 0; y < HEIGHT; y++) {
+            for (int x = 0; x < WIDTH; x++) {
+                if (before[y * WIDTH + x] != after[y * WIDTH + x]) {
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                }
+            }
+        }
+
+        return maxX < 0 ? null : new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 }

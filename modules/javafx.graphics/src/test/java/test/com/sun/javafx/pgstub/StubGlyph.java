@@ -114,6 +114,6 @@ public class StubGlyph implements Glyph {
 
     @Override
     public int getOriginY() {
-        return 0;
+        return -height;
     }
 }

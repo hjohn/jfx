@@ -98,9 +98,11 @@ public record StubFontStrike(FontResource fontResource, float size, BaseTransfor
 
     @Override
     public Shape getOutline(GlyphList gl, BaseTransform transform) {
+        float height = StubFontMetrics.BASELINE * size;
+
         return new RoundRectangle2D(
-            (float) transform.getMxt(), (float) transform.getMyt(),
-            gl.getWidth(), StubFontMetrics.BASELINE * size, 0, 0
+            (float) transform.getMxt(), (float) (transform.getMyt() - height),
+            gl.getWidth(), height, 0, 0
         );
     }
 }

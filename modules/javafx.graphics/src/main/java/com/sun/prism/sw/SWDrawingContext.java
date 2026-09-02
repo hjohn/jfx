@@ -1165,10 +1165,18 @@ public class SWDrawingContext implements DrawingContext {
         graphics.setTransform(transform);
 
         if (dirtyMinX != Float.POSITIVE_INFINITY) {
-            markRectDirty(
-                scaleX * dirtyMinX, dirtyMinY,
-                scaleX * (dirtyMaxX - dirtyMinX), dirtyMaxY - dirtyMinY
-            );
+            if (stroke) {
+                markStrokeRectDirty(
+                    scaleX * dirtyMinX, dirtyMinY,
+                    scaleX * (dirtyMaxX - dirtyMinX), dirtyMaxY - dirtyMinY
+                );
+            }
+            else {
+                markRectDirty(
+                    scaleX * dirtyMinX, dirtyMinY,
+                    scaleX * (dirtyMaxX - dirtyMinX), dirtyMaxY - dirtyMinY
+                );
+            }
         }
     }
 
