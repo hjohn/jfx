@@ -123,7 +123,7 @@ public class SWDrawingContext implements DrawingContext {
     private final Affine2D transform = new Affine2D();
     private final Deque<State> stateStack = new ArrayDeque<>();
 
-    private Rectangle clip;
+    private Rectangle clip;  // in device space
 
     // Common rendering attributes
     private double globalAlpha = 1.0;
@@ -479,13 +479,8 @@ public class SWDrawingContext implements DrawingContext {
         double mxy, double myy,
         double mxt, double myt
     ) {
-        if (clip != null && (mxy != 0 || myx != 0)) {
-            throw new UnsupportedOperationException("a transform with rotation or shear cannot be set while a clip is active");
-        }
-
         transform.setTransform(mxx, myx, mxy, myy, mxt, myt);
         graphics.setTransform(mxx, myx, mxy, myy, mxt, myt);
-        updateClip();
     }
 
     @Override
@@ -566,33 +561,31 @@ public class SWDrawingContext implements DrawingContext {
             throw new UnsupportedOperationException("clipping is not supported under a transform with rotation or shear");
         }
 
-        double x1 = Math.floor(Math.min(x, x + w));
-        double y1 = Math.floor(Math.min(y, y + h));
-        double x2 = Math.ceil(Math.max(x, x + w));
-        double y2 = Math.ceil(Math.max(y, y + h));
-        Rectangle r = new Rectangle((int) x1, (int) y1, (int) (x2 - x1), (int) (y2 - y1));
+        /*
+         * Immediately transform clip to device space:
+         */
 
-        if (clip == null) {
+        Rectangle r = transformRect(x, y, x + w, y + h);
+
+        if (r == null) {
+            clip = new Rectangle(0, 0, 0, 0);  // nothing of the rect is inside the image
+        }
+        else if (clip == null) {
             clip = r;
         }
         else {
             clip.intersectWith(r);
         }
 
-        updateClip();
+        applyClip();
     }
 
-    private void updateClip() {
+    private void applyClip() {
         if (clip == null) {
             graphics.setClipRect(null);
         }
         else {
-            Rectangle deviceClip = transformRect(
-                clip.x, clip.y,
-                clip.x + clip.width, clip.y + clip.height
-            );
-
-            graphics.setClipRect(deviceClip != null ? deviceClip : new Rectangle(0, 0, 0, 0));
+            graphics.setClipRect(clip);
         }
     }
 
@@ -639,6 +632,7 @@ public class SWDrawingContext implements DrawingContext {
         clip = s.clip() != null ? new Rectangle(s.clip()) : null;
 
         setTransform(s.mxx(), s.myx(), s.mxy(), s.myy(), s.mxt(), s.myt());
+        applyClip();
         setGlobalAlpha(s.globalAlpha());
         setGlobalBlendMode(s.globalBlendMode());
         setFill(s.fill());
@@ -1009,12 +1003,28 @@ public class SWDrawingContext implements DrawingContext {
 
         applyStrokeParameters();
 
+        /*
+         * The path coordinates were transformed into device space as they
+         * were added, and must be drawn with an identity transform. The stroke
+         * widths and dash lengths must still be adjusted if the scale != 1.0
+         */
+
+        double scale = Math.sqrt(transform.getMxx() * transform.getMxx() + transform.getMyx() * transform.getMyx());
+
+        if (scale != 1.0) {
+            graphics.setStroke(buildStroke(scale));
+        }
+
         graphics.setTransform(BaseTransform.IDENTITY_TRANSFORM);
         graphics.draw(path);
-        graphics.setTransform(transform);
+        graphics.setTransform(transform);  // restore transform
+
+        if (scale != 1.0) {
+            applyStrokeParameters();  // restore stroke just in case
+        }
 
         RectBounds bounds = path.getBounds();
-        double r = strokeExpansion();
+        double r = strokeExpansion() * scale;
 
         markDeviceRectDirty(bounds.getMinX() - r, bounds.getMinY() - r, bounds.getMaxX() + r, bounds.getMaxY() + r);
     }
@@ -1238,27 +1248,45 @@ public class SWDrawingContext implements DrawingContext {
     }
 
     private void applyStrokeParameters() {
-        if(prismStroke == null) {
-            this.prismStroke = new BasicStroke(
-                (float)lineWidth,
-                switch (lineCap) {
-                    case BUTT -> BasicStroke.CAP_BUTT;
-                    case ROUND -> BasicStroke.CAP_ROUND;
-                    case SQUARE -> BasicStroke.CAP_SQUARE;
-                },
-                switch (lineJoin) {
-                    case BEVEL -> BasicStroke.JOIN_BEVEL;
-                    case ROUND -> BasicStroke.JOIN_ROUND;
-                    case MITER -> BasicStroke.JOIN_MITER;
-                },
-                (float)miterLimit,
-                lineDashes,
-                (float)lineDashOffset
-            );
+        if (prismStroke == null) {
+            this.prismStroke = buildStroke(1.0);
         }
 
         graphics.setStroke(prismStroke);
         graphics.setPaint(prismStrokePaint);
+    }
+
+    private BasicStroke buildStroke(double widthScale) {
+        return new BasicStroke(
+            (float)(lineWidth * widthScale),
+            switch (lineCap) {
+                case BUTT -> BasicStroke.CAP_BUTT;
+                case ROUND -> BasicStroke.CAP_ROUND;
+                case SQUARE -> BasicStroke.CAP_SQUARE;
+            },
+            switch (lineJoin) {
+                case BEVEL -> BasicStroke.JOIN_BEVEL;
+                case ROUND -> BasicStroke.JOIN_ROUND;
+                case MITER -> BasicStroke.JOIN_MITER;
+            },
+            (float)miterLimit,
+            scaleDashes(widthScale),
+            (float)(lineDashOffset * widthScale)
+        );
+    }
+
+    private double[] scaleDashes(double widthScale) {
+        if (lineDashes == null) {
+            return null;
+        }
+
+        double[] scaled = new double[lineDashes.length];
+
+        for (int i = 0; i < lineDashes.length; i++) {
+            scaled[i] = lineDashes[i] * widthScale;
+        }
+
+        return scaled;
     }
 
     private void invalidateStroke() {

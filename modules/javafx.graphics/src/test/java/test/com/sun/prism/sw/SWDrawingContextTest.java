@@ -1141,6 +1141,59 @@ public class SWDrawingContextTest {
     }
 
     @Test
+    public void pathStrokeWidthShouldMatchBasicShapeStrokeUnderScale() {
+        h.context.setTransform(2, 0, 0, 2, 0, 0);  // scale x2
+        h.context.setStroke(Color.RED);
+        h.context.setLineWidth(3);
+
+        // basic stroked line
+        h.context.strokeLine(10, 10, 30, 10);
+
+        // path stroked line
+        h.context.beginPath();
+        h.context.moveTo(10, 30);
+        h.context.lineTo(30, 30);
+        h.context.stroke();
+
+        double basicLineStrokeWidth = paintedInColumn(40, 15, 30);
+        double pathLineStrokeWidth = paintedInColumn(40, 55, 64);
+
+        // a 3 pixel wide line, with scale of 2 should be 6 pixels wide:
+        assertEquals(6, basicLineStrokeWidth);
+        assertEquals(6, pathLineStrokeWidth);
+    }
+
+    @Test
+    public void clipShouldNotMoveWhenTheTransformChangesLater() {
+        h.context.setFill(Color.RED);
+        h.context.clipRect(10, 10, 10, 10);  // frozen clip in device space
+
+        h.context.setTransform(2, 0, 0, 2, 0, 0);  // the transform changes after the clip was set
+
+        h.context.fillRect(0, 0, WIDTH, HEIGHT);
+
+        assertPixel(15, 15, Color.RED);  // inside the frozen clip
+        assertPixel(30, 30, Color.TRANSPARENT);  // outside it
+    }
+
+    @Test
+    public void clipRectShouldNotResetTheCurrentPath() {
+        h.context.setFill(Color.RED);
+        h.context.beginPath();
+        h.context.moveTo(0, 0);
+        h.context.lineTo(WIDTH, 0);
+        h.context.lineTo(0, HEIGHT);
+        h.context.closePath();
+
+        h.context.clipRect(10, 10, 30, 30);
+
+        h.context.fill();  // the path must still be intact after clipRect
+
+        assertPixel(20, 20, Color.RED);  // inside the clip and the path
+        assertPixel(5, 5, Color.TRANSPARENT);  // outside the clip
+    }
+
+    @Test
     public void everyFillShouldReportDirtyRegionCoveringThePixels() {
         h.context.setFill(Color.RED);
 
@@ -1248,10 +1301,25 @@ public class SWDrawingContextTest {
     }
 
     @Test
-    public void shouldThrowWhenSettingRotatedTransformWithActiveClip() {
+    public void rotatedTransformsShouldBeAllowedWithClip() {
+        h.context.setFill(Color.RED);
         h.context.clipRect(0, 0, 10, 10);
 
-        assertThrows(UnsupportedOperationException.class, () -> h.context.setTransform(0, 1, -1, 0, 0, 0));
+        /*
+         * A clip is set in device space, so changing the transform
+         * afterwards (even to a rotation) is allowed and should not move it
+         */
+ 
+        h.context.setTransform(0, 1, -1, 0, 0, 0);
+        h.context.rotate(45);
+        h.context.transform(0, 1, -1, 0, 0, 0);
+        h.context.transform(new Affine(0, -1, 0, 1, 0, 0));
+
+        h.context.setTransform(1, 0, 0, 1, 0, 0);
+        h.context.fillRect(0, 0, WIDTH, HEIGHT);
+
+        assertPixel(5, 5, Color.RED);  // inside the clip
+        assertPixel(40, 40, Color.TRANSPARENT);  // outside it
     }
 
     @Test
@@ -1311,29 +1379,6 @@ public class SWDrawingContextTest {
         assertEquals(3.0, a.getMyy());
         assertEquals(10.0, a.getTx());
         assertEquals(20.0, a.getTy());
-    }
-
-    @Test
-    public void shouldThrowWhenRotatingWithActiveClip() {
-        h.context.clipRect(0, 0, 10, 10);
-        h.context.setTransform(1, 0, 0, 1, 5, 5);
-
-        assertThrows(UnsupportedOperationException.class, () -> h.context.rotate(45));
-
-        Affine a = h.context.getTransform();  // the transform is left unchanged
-
-        assertEquals(1.0, a.getMxx());
-        assertEquals(0.0, a.getMxy());
-        assertEquals(5.0, a.getTx());
-        assertEquals(5.0, a.getTy());
-    }
-
-    @Test
-    public void shouldThrowWhenConcatenatingRotationWithActiveClip() {
-        h.context.clipRect(0, 0, 10, 10);
-
-        assertThrows(UnsupportedOperationException.class, () -> h.context.transform(0, 1, -1, 0, 0, 0));
-        assertThrows(UnsupportedOperationException.class, () -> h.context.transform(new Affine(0, -1, 0, 1, 0, 0)));
     }
 
     @Test
@@ -1603,6 +1648,18 @@ public class SWDrawingContextTest {
         }
 
         return false;
+    }
+
+    private int paintedInColumn(int x, int y1, int y2) {
+        int count = 0;
+
+        for (int y = y1; y < y2; y++) {
+            if (h.image.getArgb(x, y) != 0) {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     /*
