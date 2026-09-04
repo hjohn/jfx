@@ -1436,24 +1436,7 @@ public final class GraphicsContext implements DrawingContext {
 
     @Override
     public void rect(double x, double y, double w, double h) {
-        coords[0] = (float) x;
-        coords[1] = (float) y;
-        coords[2] = (float) w;
-        coords[3] = 0;
-        coords[4] = 0;
-        coords[5] = (float) h;
-        curState.transform.deltaTransform(coords, 0, coords, 0, 3);
-        float x0 = coords[0] + (float) curState.transform.getMxt();
-        float y0 = coords[1] + (float) curState.transform.getMyt();
-        float dx1 = coords[2];
-        float dy1 = coords[3];
-        float dx2 = coords[4];
-        float dy2 = coords[5];
-        path.moveTo(x0, y0);
-        path.lineTo(x0+dx1, y0+dy1);
-        path.lineTo(x0+dx1+dx2, y0+dy1+dy2);
-        path.lineTo(x0+dx2, y0+dy2);
-        path.closePath();
+        addRect(path, x, y, w, h);
         markPathDirty();
 //        path.moveTo(x0, y0); // not needed, closepath leaves pen at moveto
     }
@@ -1491,18 +1474,48 @@ public final class GraphicsContext implements DrawingContext {
     @Override
     public void clip() {
         Path2D clip = new Path2D(path);
+
+        pushClip(clip);
+    }
+
+    @Override
+    public void clipRect(double x, double y, double w, double h) {
+        Path2D clip = new Path2D();
+
+        addRect(clip, x, y, w, h);
+        pushClip(clip);
+    }
+
+    private void addRect(Path2D target, double x, double y, double w, double h) {
+        coords[0] = (float) x;
+        coords[1] = (float) y;
+        coords[2] = (float) w;
+        coords[3] = 0;
+        coords[4] = 0;
+        coords[5] = (float) h;
+
+        curState.transform.deltaTransform(coords, 0, coords, 0, 3);
+
+        float x0 = coords[0] + (float) curState.transform.getMxt();
+        float y0 = coords[1] + (float) curState.transform.getMyt();
+        float dx1 = coords[2];
+        float dy1 = coords[3];
+        float dx2 = coords[4];
+        float dy2 = coords[5];
+
+        target.moveTo(x0, y0);
+        target.lineTo(x0+dx1, y0+dy1);
+        target.lineTo(x0+dx1+dx2, y0+dy1+dy2);
+        target.lineTo(x0+dx2, y0+dy2);
+        target.closePath();
+    }
+
+    private void pushClip(Path2D clip) {
         clipStack.addLast(clip);
         curState.numClipPaths++;
         GrowableDataBuffer buf = getBuffer();
         buf.putByte(NGCanvas.PUSH_CLIP);
         buf.putObject(clip);
-    }
-
-    @Override
-    public void clipRect(double x, double y, double w, double h) {
-        beginPath();
-        rect(x, y, w, h);
-        clip();
     }
 
     @Override
