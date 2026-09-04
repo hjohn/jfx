@@ -1309,7 +1309,7 @@ public class SWDrawingContextTest {
          * A clip is set in device space, so changing the transform
          * afterwards (even to a rotation) is allowed and should not move it
          */
- 
+
         h.context.setTransform(0, 1, -1, 0, 0, 0);
         h.context.rotate(45);
         h.context.transform(0, 1, -1, 0, 0, 0);
