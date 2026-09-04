@@ -171,7 +171,7 @@ public class WritableImage extends Image {
      * @throws IllegalStateException if the pixel storage of this image is not in {@code INT_ARGB_PRE}
      *     format (for example, when created from a {@code BYTE_BGRA_PRE} {@code PixelBuffer})
      */
-    public DrawingContext getDrawingContext() {
+    public final DrawingContext getDrawingContext() {
         if (drawingContext == null) {
             // note: there is only one implementation of PlatformImage (by QuantumToolkit) so the hard cast here is safe
             drawingContext = new SWDrawingContext((com.sun.prism.Image) getWritablePlatformImage(), rect -> bufferDirty(rect));
