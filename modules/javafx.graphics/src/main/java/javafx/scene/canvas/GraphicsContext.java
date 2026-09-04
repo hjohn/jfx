@@ -1478,6 +1478,11 @@ public final class GraphicsContext implements DrawingContext {
         pushClip(clip);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @since 28
+     */
     @Override
     public void clipRect(double x, double y, double w, double h) {
         Path2D clip = new Path2D();
