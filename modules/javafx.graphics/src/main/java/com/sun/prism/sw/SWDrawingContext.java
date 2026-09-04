@@ -64,7 +64,6 @@ import javafx.geometry.VPos;
 import javafx.scene.effect.BlendMode;
 import javafx.scene.image.DrawingContext;
 import javafx.scene.image.Image;
-import javafx.scene.image.PixelBuffer;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.ArcType;
@@ -187,31 +186,57 @@ public class SWDrawingContext implements DrawingContext {
     /**
      * Constructs a new instance.
      * <p>
-     * The provided image must be backed by a writable {@link PixelBuffer} with
-     * format {@link PixelFormat#INT_ARGB_PRE INT_ARGB_PRE}.
+     * The provided image must be backed by a writable {@link IntBuffer} with
+     * pixel format {@link PixelFormat#INT_ARGB_PRE INT_ARGB_PRE}. The {@code IntBuffer}
+     * must be either heap array-backed or a direct buffer, and may be a slice of a larger buffer.
      *
      * @param img a prism image, cannot be {@code null}
      * @param pixelsDirty a consumer of dirty rectangles, cannot be {@code null}
      * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalStateException if the image is not backed by a writable pixel buffer
-     *     in the correct format.
+     * @throws IllegalStateException if the image is not backed by a writable buffer
+     *     in a format supported by the software renderer
      */
     public SWDrawingContext(com.sun.prism.Image img, Consumer<Rectangle> pixelsDirty) {
-        int[] data = switch (img.getPixelBuffer()) {
-            case IntBuffer ib -> ib.array();
-            default -> throw new IllegalStateException("img must contain an accessible int buffer backed by an int array");
-        };
-
         this.pixelsDirty = Objects.requireNonNull(pixelsDirty, "pixelsDirty");
-        this.imageWidth = img.getWidth();
+        this.imageWidth = img.getWidth();  // implicit null check for img
         this.imageHeight = img.getHeight();
         this.resourceFactory = new SWResourceFactory(Screen.getMainScreen()); // Note, actual screen is irrelevant, we just need one
 
-        SWRTTexture texture = new SWRTTexture(resourceFactory, img.getWidth(), img.getHeight(), data);
+        SWRTTexture texture = createTexture(resourceFactory, img);
 
         this.graphics = texture.createGraphics();
 
         FXCleaner.register(this, new StateCleaner(resourceFactory, texture));
+    }
+
+    private static SWRTTexture createTexture(SWResourceFactory factory, com.sun.prism.Image img) {
+        int width = img.getWidth();
+        int height = img.getHeight();
+
+        IntBuffer buffer = switch (img.getPixelBuffer()) {
+            case IntBuffer b -> b;
+            default -> throw new IllegalStateException("image buffer is not in INT_ARGB_PRE format: " + img.getPixelFormat());
+        };
+
+        if (buffer.isReadOnly()) {
+            throw new IllegalStateException("image buffer must be writable");
+        }
+
+        long size = (long) width * height;
+
+        if (size > buffer.capacity() || (buffer.hasArray() && buffer.arrayOffset() + size > buffer.array().length)) {
+            throw new IllegalStateException("image buffer has insufficient capacity to hold " + width + "x" + height + " pixels");
+        }
+
+        if (buffer.hasArray()) {
+            return new SWRTTexture(factory, width, height, buffer.array(), buffer.arrayOffset());
+        }
+
+        if (buffer.isDirect()) {
+            return new SWRTTexture(factory, width, height, buffer);
+        }
+
+        throw new IllegalStateException("image buffer is neither heap array-backed nor direct");
     }
 
     private record StateCleaner(SWResourceFactory resourceFactory, SWRTTexture texture) implements Runnable {

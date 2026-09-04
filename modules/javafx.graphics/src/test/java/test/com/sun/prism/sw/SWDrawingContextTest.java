@@ -32,6 +32,7 @@ import com.sun.prism.sw.SWDrawingContext;
 
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -118,30 +119,119 @@ public class SWDrawingContextTest {
     }
 
     @Test
-    public void shouldThrowForNullImage() {
+    public void constructorShouldRejectNullImage() {
         assertThrows(NullPointerException.class, () -> new SWDrawingContext(null, _ -> {}));
     }
 
     @Test
-    public void shouldThrowForNullDirtyConsumer() {
+    public void constructorShouldRejectNullDirtyConsumer() {
         com.sun.prism.Image image = prismImage(WIDTH, HEIGHT);
 
         assertThrows(NullPointerException.class, () -> new SWDrawingContext(image, null));
     }
 
     @Test
-    public void shouldThrowForByteBufferImage() {
+    public void constructorShouldRejectByteBufferImage() {
         com.sun.prism.Image image = com.sun.prism.Image.fromByteBgraPreData(ByteBuffer.allocate(WIDTH * HEIGHT * 4), WIDTH, HEIGHT);
 
         assertThrows(IllegalStateException.class, () -> new SWDrawingContext(image, _ -> {}));
     }
 
     @Test
-    public void shouldThrowForNonArrayBackedIntBuffer() {
-        IntBuffer direct = ByteBuffer.allocateDirect(WIDTH * HEIGHT * 4).asIntBuffer();
-        com.sun.prism.Image image = com.sun.prism.Image.fromIntArgbPreData(direct, WIDTH, HEIGHT);
+    public void constructorShouldRejectReadOnlyHeapIntBuffer() {
+        IntBuffer readOnly = IntBuffer.allocate(WIDTH * HEIGHT).asReadOnlyBuffer();
+        com.sun.prism.Image image = com.sun.prism.Image.fromIntArgbPreData(readOnly, WIDTH, HEIGHT);
 
-        assertThrows(UnsupportedOperationException.class, () -> new SWDrawingContext(image, _ -> {}));
+        assertThrows(IllegalStateException.class, () -> new SWDrawingContext(image, _ -> {}));
+    }
+
+    @Test
+    public void constructorShouldRejectReadOnlyDirectIntBuffer() {
+        IntBuffer readOnly = ByteBuffer.allocateDirect(WIDTH * HEIGHT * Integer.BYTES)
+            .order(ByteOrder.nativeOrder())
+            .asIntBuffer()
+            .asReadOnlyBuffer();
+        com.sun.prism.Image image = com.sun.prism.Image.fromIntArgbPreData(readOnly, WIDTH, HEIGHT);
+
+        assertThrows(IllegalStateException.class, () -> new SWDrawingContext(image, _ -> {}));
+    }
+
+    @Test
+    public void constructorShouldRejectTooSmallIntBuffer() {
+        IntBuffer small = IntBuffer.allocate(WIDTH * HEIGHT - 1);
+        com.sun.prism.Image image = com.sun.prism.Image.fromIntArgbPreData(small, WIDTH, HEIGHT);
+
+        assertThrows(IllegalStateException.class, () -> new SWDrawingContext(image, _ -> {}));
+    }
+
+    @Test
+    public void shouldDrawIntoHeapIntBuffer() {
+        IntBuffer buffer = IntBuffer.allocate(WIDTH * HEIGHT);
+
+        assertTrue(buffer.hasArray());
+        assertEquals(0, buffer.arrayOffset());
+        assertUsableBuffer(buffer);
+    }
+
+    @Test
+    public void shouldDrawIntoHeapSliceOfLargerBuffer() {
+        int paddingSize = 7;
+        int sentinel = 0x11223344;
+        int[] array = new int[2 * paddingSize + WIDTH * HEIGHT];
+
+        Arrays.fill(array, 0, paddingSize, sentinel);
+        Arrays.fill(array, paddingSize + WIDTH * HEIGHT, paddingSize + WIDTH * HEIGHT + paddingSize, sentinel);
+
+        IntBuffer buffer = IntBuffer.wrap(array);
+
+        buffer.position(paddingSize);
+
+        IntBuffer slice = buffer.slice();
+
+        assertTrue(slice.hasArray());
+        assertEquals(paddingSize, slice.arrayOffset());
+        assertUsableBuffer(slice);
+
+        for (int i = 0; i < paddingSize; i++) {
+            assertEquals(sentinel, array[i], "pixel before the slice must be untouched");
+            assertEquals(sentinel, array[i + WIDTH * HEIGHT + paddingSize], "pixel after the slice must be untouched");
+        }
+    }
+
+    @Test
+    public void shouldDrawIntoDirectIntBuffer() {
+        IntBuffer buffer = ByteBuffer.allocateDirect(WIDTH * HEIGHT * 4)
+            .order(ByteOrder.nativeOrder())
+            .asIntBuffer();
+
+        assertTrue(buffer.isDirect());
+        assertUsableBuffer(buffer);
+    }
+
+    @Test
+    public void shouldDrawIntoDirectSliceOfLargerBuffer() {
+        int paddingSize = 7;
+        int sentinel = 0x11223344;
+        IntBuffer buffer = ByteBuffer.allocateDirect((2 * paddingSize + WIDTH * HEIGHT) * 4)
+            .order(ByteOrder.nativeOrder())
+            .asIntBuffer();
+
+        for (int i = 0; i < paddingSize; i++) {
+            buffer.put(i, sentinel);
+            buffer.put(i + WIDTH * HEIGHT + paddingSize, sentinel);
+        }
+
+        buffer.position(paddingSize);
+
+        IntBuffer slice = buffer.slice();
+
+        assertTrue(slice.isDirect());
+        assertUsableBuffer(slice);
+
+        for (int i = 0; i < paddingSize; i++) {
+            assertEquals(sentinel, buffer.get(i), "pixel before the slice must be untouched");
+            assertEquals(sentinel, buffer.get(i + WIDTH * HEIGHT + paddingSize), "pixel after the slice must be untouched");
+        }
     }
 
     @Test
@@ -1441,6 +1531,31 @@ public class SWDrawingContextTest {
 
     private static com.sun.prism.Image prismImage(int w, int h) {
         return com.sun.prism.Image.fromIntArgbPreData(IntBuffer.allocate(w * h), w, h);
+    }
+
+    /*
+     * Test draw inside the given buffer, and checks if the correct pixels were modified.
+     */
+    private static void assertUsableBuffer(IntBuffer buffer) {
+        com.sun.prism.Image image = com.sun.prism.Image.fromIntArgbPreData(buffer, WIDTH, HEIGHT);
+        SWDrawingContext context = new SWDrawingContext(image, _ -> { });
+
+        context.setFill(Color.WHITE);
+        context.fillRect(0, 0, WIDTH, HEIGHT);
+        context.setFill(Color.RED);
+        context.fillRect(5, 5, 15, 15);
+
+        for (int y = 0; y < HEIGHT; y++) {
+            for (int x = 0; x < WIDTH; x++) {
+                boolean inside = x >= 5 && y >= 5 && x < 20 && y < 20;
+
+                assertEquals(
+                    inside ? 0xFFFF0000 : 0xFFFFFFFF,
+                    buffer.get(x + y * WIDTH),
+                    "expected [" + x + ", " + y + "] to be " + (inside ? "red" : "white")
+                );
+            }
+        }
     }
 
     private static Image createSolidFxImage(int w, int h, int argbpre) {

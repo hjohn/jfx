@@ -164,18 +164,22 @@ public class WritableImage extends Image {
 
     /**
      * Returns the {@link DrawingContext} associated with this image.
+     * <p>
+     * The pixel storage of this image must be in {@link PixelFormat.Type#INT_ARGB_PRE INT_ARGB_PRE} format,
+     * which is the case for images created with the {@code (width, height)} constructor. An image
+     * created from a {@link PixelBuffer} must use a pixel format of that type.
      *
      * @return the {@link DrawingContext} associated with this image, never {@code null}
+     * @throws IllegalStateException if the pixel storage of this image is not in {@code INT_ARGB_PRE}
+     *     format (for example, when created from a {@code BYTE_BGRA_PRE} {@code PixelBuffer})
      */
     public DrawingContext getDrawingContext() {
         SWDrawingContext context = drawingContextRef == null ? null : drawingContextRef.get();
 
         if (context == null) {
-            if (!(getWritablePlatformImage() instanceof com.sun.prism.Image img)) {
-                throw new IllegalStateException("platformImage must be a prism image");
-            }
+            // note: there is only one implementation of PlatformImage (by QuantumToolkit) so the hard cast here is safe
+            context = new SWDrawingContext((com.sun.prism.Image) getWritablePlatformImage(), rect -> bufferDirty(rect));
 
-            context = new SWDrawingContext(img, rect -> bufferDirty(rect));
             drawingContextRef = new WeakReference<>(context);
         }
 
