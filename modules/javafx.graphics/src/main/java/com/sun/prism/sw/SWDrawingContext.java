@@ -280,9 +280,9 @@ public class SWDrawingContext implements DrawingContext {
 
     @Override
     public void setGlobalAlpha(double alpha) {
-        this.globalAlpha = Math.clamp(alpha, 0.0, 1.0);
+        this.globalAlpha = alpha;
 
-        graphics.setExtraAlpha((float) globalAlpha);
+        graphics.setExtraAlpha((float) Math.clamp(alpha, 0.0, 1.0));
     }
 
     @Override

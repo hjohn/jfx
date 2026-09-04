@@ -271,14 +271,19 @@ public class SWDrawingContextTest {
     }
 
     @Test
-    public void shouldClampGlobalAlpha() {
+    public void shouldStoreTheSetAlphaAndClampForRendering() {
         h.context.setGlobalAlpha(2.0);
 
-        assertEquals(1.0, h.context.getGlobalAlpha());
+        assertEquals(2.0, h.context.getGlobalAlpha());
+
+        h.context.setFill(Color.RED);
+        h.context.fillRect(0, 0, 10, 10);
+
+        assertPixel(5, 5, Color.RED);  // the out-of-range alpha is clamped to 1.0 for rendering
 
         h.context.setGlobalAlpha(-1.0);
 
-        assertEquals(0.0, h.context.getGlobalAlpha());
+        assertEquals(-1.0, h.context.getGlobalAlpha());
 
         h.context.setGlobalAlpha(0.5);
 
