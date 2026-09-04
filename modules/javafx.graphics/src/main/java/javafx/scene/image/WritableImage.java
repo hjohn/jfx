@@ -31,7 +31,6 @@ import com.sun.javafx.tk.PlatformImage;
 import com.sun.javafx.tk.Toolkit;
 import com.sun.prism.sw.SWDrawingContext;
 
-import java.lang.ref.WeakReference;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
@@ -63,6 +62,7 @@ public class WritableImage extends Image {
     }
 
     private ImageLoader tkImageLoader;
+    private SWDrawingContext drawingContext;
 
     /**
      * Constructs an empty image of the specified dimensions.
@@ -160,8 +160,6 @@ public class WritableImage extends Image {
         getPixelWriter().setPixels(0, 0, width, height, reader, x, y);
     }
 
-    private WeakReference<SWDrawingContext> drawingContextRef;
-
     /**
      * Returns the {@link DrawingContext} associated with this image.
      * <p>
@@ -174,16 +172,12 @@ public class WritableImage extends Image {
      *     format (for example, when created from a {@code BYTE_BGRA_PRE} {@code PixelBuffer})
      */
     public DrawingContext getDrawingContext() {
-        SWDrawingContext context = drawingContextRef == null ? null : drawingContextRef.get();
-
-        if (context == null) {
+        if (drawingContext == null) {
             // note: there is only one implementation of PlatformImage (by QuantumToolkit) so the hard cast here is safe
-            context = new SWDrawingContext((com.sun.prism.Image) getWritablePlatformImage(), rect -> bufferDirty(rect));
-
-            drawingContextRef = new WeakReference<>(context);
+            drawingContext = new SWDrawingContext((com.sun.prism.Image) getWritablePlatformImage(), rect -> bufferDirty(rect));
         }
 
-        return context;
+        return drawingContext;
     }
 
     @Override
