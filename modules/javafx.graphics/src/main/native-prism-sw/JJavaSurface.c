@@ -154,7 +154,6 @@ surface_acquire(AbstractSurface* abstractSurface, JNIEnv* env, jobject surfaceHa
     if (arrayData == NULL) {
         surface->dataHandle = NULL;
         setMemErrorFlag();
-
         return;
     }
 

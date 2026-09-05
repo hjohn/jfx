@@ -124,14 +124,11 @@ static void
 surface_acquire(AbstractSurface* abstractSurface, JNIEnv* env, jobject surfaceHandle) {
     DirectBufferSurface* surface = (DirectBufferSurface*)abstractSurface;
 
-    jint width = 0;
-    jint height = 0;
-    void* data;
-
     surface->dataHandle = (*env)->GetObjectField(env, surfaceHandle, surface->bufferFieldID);
 
-    width = abstractSurface->super.width;
-    height = abstractSurface->super.height;
+    jint width = abstractSurface->super.width;
+    jint height = abstractSurface->super.height;
+
     if (width < 0 || height < 0) {  // note: Java side already verifies these (including size), so this is a bit redundant
         // Set data to NULL indicating invalid width and height
         abstractSurface->super.data = NULL;
@@ -140,7 +137,8 @@ surface_acquire(AbstractSurface* abstractSurface, JNIEnv* env, jobject surfaceHa
         return;
     }
 
-    data = (*env)->GetDirectBufferAddress(env, surface->dataHandle);
+    void* data = (*env)->GetDirectBufferAddress(env, surface->dataHandle);
+
     if (data == NULL) {
         abstractSurface->super.data = NULL;
         surface->dataHandle = NULL;
