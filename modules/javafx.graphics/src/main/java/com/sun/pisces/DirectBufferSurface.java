@@ -47,8 +47,8 @@ public final class DirectBufferSurface extends AbstractSurface {
      * @param width the width, cannot be negative
      * @param height the height, cannot be negative
      * @throws NullPointerException if {@code buffer} is {@code null}
-     * @throws IllegalArgumentException if {@code dataType} is unsupported, {@code buffer} is not a direct buffer,
-     *     or {@code buffer} is too small for the given {@code width} and {@code height}
+     * @throws IllegalArgumentException if {@code dataType} is unsupported, {@code buffer} is not a direct
+     *     writable buffer, or {@code buffer} is too small for the given {@code width} and {@code height}
      */
     public DirectBufferSurface(IntBuffer buffer, int dataType, int width, int height) {
         super(width, height);
@@ -59,6 +59,10 @@ public final class DirectBufferSurface extends AbstractSurface {
 
         if (!buffer.isDirect()) {  // implicit null check for buffer
             throw new IllegalArgumentException("buffer must be a direct buffer");
+        }
+
+        if (buffer.isReadOnly()) {
+            throw new IllegalArgumentException("buffer must not be read-only");
         }
 
         if ((long) width * height > buffer.capacity()) {
