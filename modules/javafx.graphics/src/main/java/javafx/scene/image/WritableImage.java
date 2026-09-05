@@ -29,7 +29,6 @@ import com.sun.javafx.geom.Rectangle;
 import com.sun.javafx.tk.ImageLoader;
 import com.sun.javafx.tk.PlatformImage;
 import com.sun.javafx.tk.Toolkit;
-import com.sun.prism.sw.SWDrawingContext;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
@@ -62,7 +61,7 @@ public class WritableImage extends Image {
     }
 
     private ImageLoader tkImageLoader;
-    private SWDrawingContext drawingContext;
+    private DrawingContext drawingContext;
 
     /**
      * Constructs an empty image of the specified dimensions.
@@ -173,11 +172,19 @@ public class WritableImage extends Image {
      */
     public final DrawingContext getDrawingContext() {
         if (drawingContext == null) {
-            // note: there is only one implementation of PlatformImage (by QuantumToolkit) so the hard cast here is safe
-            drawingContext = new SWDrawingContext((com.sun.prism.Image) getWritablePlatformImage(), rect -> bufferDirty(rect));
+            drawingContext = Toolkit.getToolkit().createDrawingContext(getWritablePlatformImage(), this::notifyDrawingContextDirty);
         }
 
         return drawingContext;
+    }
+
+    private void notifyDrawingContextDirty(Rectangle rect) {
+        if (pixelBuffer != null) {
+            pixelBuffer.bufferDirty(rect);
+        }
+        else {
+            bufferDirty(rect);
+        }
     }
 
     @Override

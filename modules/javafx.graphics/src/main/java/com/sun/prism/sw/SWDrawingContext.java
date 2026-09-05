@@ -25,7 +25,6 @@
 
 package com.sun.prism.sw;
 
-import com.sun.glass.ui.Screen;
 import com.sun.glass.utils.NativeLibLoader;
 import com.sun.javafx.font.FontResource;
 import com.sun.javafx.font.FontStrike;
@@ -200,7 +199,7 @@ public class SWDrawingContext implements DrawingContext {
         this.pixelsDirty = Objects.requireNonNull(pixelsDirty, "pixelsDirty");
         this.imageWidth = img.getWidth();  // implicit null check for img
         this.imageHeight = img.getHeight();
-        this.resourceFactory = new SWResourceFactory(Screen.getMainScreen()); // Note, actual screen is irrelevant, we just need one
+        this.resourceFactory = new SWResourceFactory(null);
 
         SWRTTexture texture = createTexture(resourceFactory, img);
 
