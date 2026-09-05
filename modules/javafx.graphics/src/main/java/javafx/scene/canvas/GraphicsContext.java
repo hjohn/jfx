@@ -1407,6 +1407,7 @@ public final class GraphicsContext implements DrawingContext {
     public void arcTo(double x1, double y1, double x2, double y2, double radius) {
         if (path.getNumCommands() == 0) {
             moveTo(x1, y1);
+            lineTo(x1, y1);
         }
         else {
             try {

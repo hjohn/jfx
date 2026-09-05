@@ -838,6 +838,21 @@ public class SWDrawingContextTest {
     }
 
     @Test
+    public void arcToOnAnEmptyPathShouldRenderADotWithRoundCaps() {
+        h.context.setStroke(Color.RED);
+        h.context.setLineWidth(6);
+        h.context.setLineCap(StrokeLineCap.ROUND);
+
+        h.context.beginPath();
+        h.context.arcTo(10, 10, 30, 10, 5);  // can't draw arc without starting point
+        h.context.stroke();
+
+        assertPixel(10, 10, Color.RED);  // center of the dot
+        assertPixel(11, 10, Color.RED);  // within the round cap radius
+        assertPixel(15, 10, Color.TRANSPARENT);  // outside the dot
+    }
+
+    @Test
     public void appendSVGPathShouldPaint() {
         h.context.setFill(Color.RED);
         h.context.beginPath();
