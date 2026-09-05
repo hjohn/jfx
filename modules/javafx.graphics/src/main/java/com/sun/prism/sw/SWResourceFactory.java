@@ -74,7 +74,7 @@ final class SWResourceFactory
     /**
      * Returns the {@link Screen} associated with this resource factory. This may
      * be {@code null} if the factory is only used for off-screen drawing.
-     * 
+     *
      * @return the {@link Screen}, or {@code null} if unavailable
      */
     public Screen getScreen() {
