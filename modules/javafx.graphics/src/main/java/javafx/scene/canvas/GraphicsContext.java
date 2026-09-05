@@ -1411,6 +1411,7 @@ public final class GraphicsContext implements DrawingContext {
         else {
             try {
                 path.arcTo(curState.transform, (float) x1, (float) y1, (float) x2, (float) y2, (float) radius);
+                markPathDirty();
             }
             catch (IllegalPathStateException | NoninvertibleTransformException e) {
                 lineTo(x1, y1);
@@ -1447,6 +1448,7 @@ public final class GraphicsContext implements DrawingContext {
 
         try {
             path.appendSVGPath(curState.transform, svgpath);
+            markPathDirty();
         }
         catch (IllegalArgumentException | IllegalPathStateException | NoninvertibleTransformException e) {
             //Ignore incorrect path
