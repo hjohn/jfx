@@ -121,39 +121,42 @@ initializeSurfaceFieldIds(JNIEnv* env, jobject objectHandle) {
 }
 
 static void
-surface_acquire(AbstractSurface* surface, JNIEnv* env, jobject surfaceHandle) {
+surface_acquire(AbstractSurface* abstractSurface, JNIEnv* env, jobject surfaceHandle) {
+    DirectBufferSurface* surface = (DirectBufferSurface*)abstractSurface;
+
     jint width = 0;
     jint height = 0;
     void* data;
 
-    ((DirectBufferSurface *) surface)->dataHandle =
-        (*env)->GetObjectField(env, surfaceHandle, ((DirectBufferSurface *) surface)->bufferFieldID);
+    surface->dataHandle = (*env)->GetObjectField(env, surfaceHandle, surface->bufferFieldID);
 
-    width = surface->super.width;
-    height = surface->super.height;
+    width = abstractSurface->super.width;
+    height = abstractSurface->super.height;
     if (width < 0 || height < 0) {  // note: Java side already verifies these (including size), so this is a bit redundant
         // Set data to NULL indicating invalid width and height
-        surface->super.data = NULL;
-        ((DirectBufferSurface *) surface)->dataHandle = NULL;
+        abstractSurface->super.data = NULL;
+        surface->dataHandle = NULL;
         JNI_ThrowNew(env, "java/lang/IllegalArgumentException", "Out of range access of buffer");
         return;
     }
 
-    data = (*env)->GetDirectBufferAddress(env, ((DirectBufferSurface *) surface)->dataHandle);
+    data = (*env)->GetDirectBufferAddress(env, surface->dataHandle);
     if (data == NULL) {
-        surface->super.data = NULL;
-        ((DirectBufferSurface *) surface)->dataHandle = NULL;
+        abstractSurface->super.data = NULL;
+        surface->dataHandle = NULL;
         JNI_ThrowNew(env, "java/lang/IllegalArgumentException", "Surface is not backed by a direct buffer");
         return;
     }
 
-    surface->super.data = data;
+    abstractSurface->super.data = data;
 }
 
 static void
-surface_release(AbstractSurface* surface, JNIEnv* env, jobject surfaceHandle) {
-    surface->super.data = NULL;
-    ((DirectBufferSurface *) surface)->dataHandle = NULL;
+surface_release(AbstractSurface* abstractSurface, JNIEnv* env, jobject surfaceHandle) {
+    DirectBufferSurface* surface = (DirectBufferSurface*)abstractSurface;
+
+    abstractSurface->super.data = NULL;
+    surface->dataHandle = NULL;
 }
 
 static void
